@@ -1,0 +1,77 @@
+/* The splittable workspace: panels, gutters, the corner handle, previews and the editor menu */
+.ws { height: 100%; min-height: 0; min-width: 0; position: relative; }
+.ws.dragging { user-select: none; cursor: crosshair; }
+.split { display: grid; height: 100%; width: 100%; min-height: 0; min-width: 0; }
+.split.horizontal { grid-template-rows: minmax(0, 1fr); }
+.split.vertical { grid-template-columns: minmax(0, 1fr); }
+.split > * { min-width: 0; min-height: 0; }
+
+.gutter { position: relative; display: grid; place-items: center; touch-action: none; outline: none; }
+.split.horizontal > .gutter { cursor: col-resize; }
+.split.vertical > .gutter { cursor: row-resize; }
+.gutter i { display: block; border-radius: 3px; background: var(--line); transition: background .15s; }
+.split.horizontal > .gutter i { width: 3px; height: 36px; }
+.split.vertical > .gutter i { height: 3px; width: 36px; }
+.gutter:hover i, .gutter:focus-visible i { background: var(--s-dsa); }
+
+.panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.phead { flex: none; display: flex; align-items: center; height: 34px; padding: 0 6px; border-bottom: 1px solid var(--line); }
+.pmenu { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; height: 26px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink); font: 700 .8rem system-ui, sans-serif; cursor: pointer; }
+.pmenu:hover, .pmenu[aria-expanded="true"] { background: var(--bg); border-color: var(--line); }
+.pbody { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.pbody > .edroot { flex: 1 1 0; min-height: 0; min-width: 0; }
+
+.edroot { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.edroot.dright { border: 0; border-radius: 0; background: none; height: auto; }
+.edroot.dout, .pbody > .dout { padding: 8px 10px; }
+.dleft-in .codeview, .dleft-in .srcedit, .dleft-in .edwrap { flex: 1 1 0; min-height: 0; }
+.dleft-in .dtabs { height: 40px; }
+.edroot > .dout { flex: 1 1 0; }
+
+/* the small corner handle */
+.pcorner { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 6; cursor: crosshair; touch-action: none; border-bottom-right-radius: 12px;
+    background: linear-gradient(135deg, transparent 0 48%, var(--muted) 48% 54%, transparent 54% 66%, var(--muted) 66% 72%, transparent 72%); opacity: .45; }
+.pcorner:hover { opacity: 1; }
+
+/* previews while dragging from the corner */
+.pov { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; border-radius: 12px; }
+.pov span { font: 800 2.4rem/1 system-ui, sans-serif; padding: 8px 18px; border-radius: 14px; }
+.panel.p-join { outline: 3px solid var(--good); outline-offset: -3px; }
+.panel.p-join .pov { background: color-mix(in srgb, var(--good) 22%, transparent); } .panel.p-join .pov span { color: var(--good); }
+.panel.p-swap { outline: 3px solid var(--accent); outline-offset: -3px; }
+.panel.p-swap .pov { background: color-mix(in srgb, var(--accent) 22%, transparent); } .panel.p-swap .pov span { color: var(--accent); }
+.panel.p-bad { outline: 3px solid var(--bad); outline-offset: -3px; }
+.panel.p-bad .pov { background: color-mix(in srgb, var(--bad) 22%, transparent); } .panel.p-bad .pov span { color: var(--bad); }
+.panel.p-source { outline: 2px dashed var(--s-dsa); outline-offset: -2px; }
+.pghost { position: absolute; z-index: 7; background: var(--s-dsa); pointer-events: none; box-shadow: 0 0 0 1px color-mix(in srgb, var(--s-dsa) 40%, transparent); }
+.pghost.horizontal { top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+.pghost.vertical { left: 0; right: 0; height: 2px; margin-top: -1px; }
+
+/* the editor menu (in the page body, so it is never clipped by a panel) */
+.pmenu-list { position: fixed; z-index: 1000; min-width: 190px; overflow: auto; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); }
+.pmenu-cat { padding: 6px 10px 2px; font: 800 .66rem system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.pmenu-list button { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: 600 .86rem system-ui, sans-serif; cursor: pointer; }
+.pmenu-list button:hover, .pmenu-list button:focus-visible { background: var(--bg); outline: none; }
+.pmenu-list button.on { color: var(--s-dsa-ink); background: color-mix(in srgb, var(--s-dsa) 16%, transparent); }
+
+/* layout buttons in the lesson header */
+.lbtns { display: inline-flex; gap: 6px; }
+.lbtns .btn.small { height: 36px; min-height: 36px; padding: 0 12px; }
+@media (prefers-reduced-motion: reduce) { .gutter i { transition: none; } }
+
+/* a Steps panel can be made narrow: the stack and the heap stack up, and the step bar stays on one line */
+.edroot.dright { container-type: inline-size; }
+@container (max-width: 340px) { .edroot.dright .dbar .prog { display: none; } .edroot.dright .dbar { gap: 4px; } .edroot.dright .dbar .btn.nav { min-width: 36px; padding: 6px; } }
+.dbar { gap: 6px; flex-wrap: nowrap; }
+.dbar .prog { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dbar .btn.nav { flex: none; }
+
+/* the header is the handle for swapping places: press (hold, on a touch screen) and drag it onto a neighbour */
+.phead { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; -webkit-touch-callout: none; }
+.phead .pmenu { cursor: pointer; }
+.ws.dragging.swap .phead, .ws.dragging.swap { cursor: grabbing; }
+.pgrip { flex: 1; align-self: stretch; display: flex; align-items: center; justify-content: flex-end; gap: 3px; padding: 0 8px; min-width: 24px; }
+.pgrip i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); opacity: .45; }
+.phead:hover .pgrip i { opacity: .8; }
+.panel.p-armed { outline: 2px solid var(--accent); outline-offset: -2px; }
+.panel.p-lifted { outline: 2px dashed var(--accent); outline-offset: -2px; opacity: .85; }

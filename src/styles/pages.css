@@ -1,0 +1,243 @@
+/* ---------- Home and Subject pages (same look as the lessons: cards, pills, accent, dark mode via the :root variables) ---------- */
+.muted { color: var(--muted); }
+.search { width: 100%; max-width: 460px; min-height: 42px; border-radius: 999px; padding: 8px 16px; background: var(--card); }
+.eyebrow { font-size: .74rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+a.card.link { text-decoration: none; color: inherit; }
+a.card.link:hover { border-color: var(--accent); }
+a.card.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.continue { display: grid; gap: 3px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; background: color-mix(in srgb, var(--accent) 9%, var(--card)); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.continue .eyebrow, .continue b, .continue .muted { grid-column: 1; }
+.continue .go { grid-column: 2; grid-row: 1 / span 3; }
+.subjects { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.subject { display: grid; gap: 4px; align-content: start; }
+.subject b { font-size: 1.1rem; }
+.subject.soon { border-style: dashed; background: transparent; color: var(--muted); }
+.subject.soon b { color: var(--muted); font-weight: 600; }
+#savedSubject .hint { margin: 0; }
+@media (max-width: 380px) {
+    .continue { grid-template-columns: minmax(0, 1fr); }
+    .continue .go { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 6px; }
+}
+
+/* ---------- lesson top bar: back | lesson name | tabs (no sidebar, no drawer) ---------- */
+.hdr .brand { gap: 8px; }
+.backarrow { color: var(--ink); flex: none; min-width: 38px; min-height: 38px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.backarrow svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.hdr h1 { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) {
+    .hdr .tabs[role="tablist"] { order: 4; flex: 1 1 100%; display: flex; }
+    .hdr .tabs[role="tablist"] .tab { flex: 1; padding: 6px 4px; font-size: .82rem; }
+}
+@media (max-height: 520px) { h1 { display: block; font-size: 1rem; } }
+
+/* ---------- Graphical lesson: graph + small tables inside the step card ---------- */
+.gv { display: flex; gap: 12px; width: 100%; height: 100%; align-items: flex-start; }
+.gv.col { flex-direction: column; gap: 6px; }
+.gg { flex: none; }
+.gsvg { display: block; }
+.gt2 { flex: none; overflow: auto; display: flex; align-items: center; justify-content: center; }
+.gsvg .gl { stroke: var(--line); stroke-width: 1; }
+.gsvg .gax { stroke: var(--muted); stroke-width: 1.6; }
+.gsvg .gt { fill: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.gsvg .gname { fill: var(--ink); font-weight: 800; }
+.gsvg .giso { stroke: var(--ink); }
+.gsvg .gguide { stroke: var(--muted); stroke-width: 1.3; }
+.gsvg .plbl { fill: var(--ink); font-family: ui-monospace, Consolas, monospace; font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
+.viz .tbl.gtbl { margin: 0; }
+.tbl.gtbl td.lt { text-align: left; }
+.tbl tr.best td { background: var(--fresh); font-weight: 800; }
+.tbl tr.best td:first-child { box-shadow: inset 3px 0 0 var(--good); }
+.cur.nomargin { margin-left: 0; }
+details.tp { margin-top: 10px; color: var(--muted); font-size: .85rem; }
+details.tp summary { cursor: pointer; padding: 4px 0; }
+@media (max-width: 480px) {
+    .hdr { padding: 4px 2px; row-gap: 4px; }
+    .hdr .tab { padding: 4px 4px; font-size: .8rem; }
+    .hdr .newbtn { min-height: 28px; padding: 2px 8px; }
+    .hdr h1 { font-size: 1.05rem; }
+}
+
+/* ---------- Transportation lesson: cost grid (cost in a small box top-right, allocation large in the middle) ---------- */
+.ttbl table { table-layout: fixed; }
+.ttbl th { font-weight: 700; overflow: hidden; white-space: nowrap; }
+.ttbl th.rowh { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.ttbl th.corner { background: transparent; border-color: transparent; }
+.ttbl td.tc { position: relative; padding: 0; }
+.ttbl .cbox { position: absolute; top: 2px; right: 2px; font-size: var(--cfs, 9px); line-height: 1.2; padding: 0 3px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--bg); font-weight: 600; }
+.ttbl .al { font-weight: 800; display: inline-block; }
+.ttbl .idx { display: inline-flex; align-items: center; justify-content: center; min-width: 1.9em; height: 1.9em; padding: 0 .25em; border-radius: 999px; border: 2px solid var(--muted); font-weight: 800; font-size: .86em; color: var(--ink); background: var(--card); }
+.ttbl .idx.neg { border-color: var(--bad); color: var(--bad); }
+.ttbl .sgn { position: absolute; left: 4px; top: 0; font-weight: 900; font-size: 1.15em; color: var(--accent); }
+.ttbl td.enter { background: var(--oc); }
+.ttbl td.leave { background: var(--rr); }
+.ttbl td.new { background: var(--fresh); }
+.ttbl td.hl { box-shadow: inset 0 0 0 2px var(--accent); }
+.ttbl td.loop { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
+.ttbl .gr { opacity: .4; background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--muted) 35%, transparent) 5px 6px); }
+.ttbl th.dm { font-style: italic; }
+.ttbl td.newcell, .ttbl th.newd { background: color-mix(in srgb, var(--pivot) 28%, var(--card)); }
+.ttbl .to { font-style: normal; color: var(--muted); padding: 0 .2em; }
+.ttbl td.uvc { background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.ttbl td.tcell { font-weight: 800; }
+.ttbl td.sd .v { font-weight: 700; }
+.tbl td.enter.src, .tbl td.leave.src { box-shadow: inset 0 0 0 2px var(--hc, #1c7ed6); }
+.loopsvg { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+.looppath { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 5; stroke-linejoin: round; stroke-linecap: round; opacity: .6; }
+.tform th.lbl { text-align: left; white-space: nowrap; }
+.tbl tr.foot td { border-top: 2px solid var(--line); background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
+@media (max-width: 480px) {
+    .tform th.lbl { white-space: normal; max-width: 70px; font-size: .72rem; line-height: 1.15; }
+    #form.tform input.num, #form.tform input.nm { width: clamp(32px, 10.5vw, 54px); padding-left: 1px; padding-right: 1px; font-size: 15px; }
+    #form.tform td, #form.tform th { padding: 2px; }
+}
+
+.gv { justify-content: center; }
+.gv.col { align-items: center; }
+/* ---------- flowing step card (Graphical, Transportation): no scrolling, no dead space ----------
+   Stacked on narrow screens (title, text, formula, viz); on wide / landscape screens the text sits in a left column and
+   the viz fills the whole right column. The text takes the height it needs, the viz gets everything that is left. */
+.stepCard.flow { grid-template-rows: max-content max-content max-content minmax(0, 1fr) max-content; row-gap: 6px; }   /* max-content: text rows never get squeezed, so overflow is detected and the text is shrunk instead */
+.stepCard.flow { --fz: 1; }
+.stepCard.flow .stext { overflow: visible; font-size: calc(.94rem * var(--fz)); }
+.stepCard.flow .formula { height: auto; min-height: 38px; padding: 6px 12px; overflow: visible; font-size: calc(clamp(.82rem, .5vw + .62rem, 1.05rem) * var(--fz)); }
+.stepCard.flow .formula.wrap { white-space: normal; display: block; line-height: 1.5; word-break: break-word; }
+.stepCard.flow .legend:empty { display: none; }
+.stepCard.flow > * { min-height: auto; }   /* text rows take the height they need, so overflow can be measured and fixed */
+.stepCard.flow > .viz { min-height: 0; }
+.stepCard.flow.textonly { grid-template-rows: max-content max-content; }
+.stepCard.flow.textonly .stext { font-size: calc(1.05rem * var(--fz)); }
+.stepCard.flow .gt2 { overflow: hidden; align-items: flex-start; }
+.stepCard.flow .viz { overflow: hidden; }
+@media (min-width: 560px) and (min-aspect-ratio: 5/4) {
+    .stepCard.flow:not(.textonly) { grid-template-columns: minmax(250px, 38%) minmax(0, 1fr); grid-template-rows: max-content max-content max-content 1fr max-content; column-gap: 14px; }
+    .stepCard.flow:not(.textonly) h3 { grid-column: 1; grid-row: 1; }
+    .stepCard.flow:not(.textonly) .stext { grid-column: 1; grid-row: 2; font-size: calc(1rem * var(--fz)); }
+    .stepCard.flow:not(.textonly) .formula { grid-column: 1; grid-row: 3; }
+    .stepCard.flow:not(.textonly) .legend { grid-column: 1; grid-row: 5; align-self: end; }
+    .stepCard.flow:not(.textonly) .viz { grid-column: 2; grid-row: 1 / -1; }
+}
+@media (min-width: 560px) and (min-aspect-ratio: 5/4) {
+    .stepCard.flow:not(.textonly) .stext { font-size: calc(clamp(1rem, 1.05vw + .55rem, 1.2rem) * var(--fz)); }
+    .stepCard.flow:not(.textonly) .formula.wrap { font-size: calc(clamp(.9rem, .6vw + .6rem, 1.1rem) * var(--fz)); }
+}
+.stepCard.flow .viz .tw { margin: 0; }
+
+/* ---------- Graphical tab 3: the final graph + test points ---------- */
+.final3 { display: grid; gap: 10px; align-content: start; justify-items: center; }
+.final3 .tp3 { width: 100%; max-width: 520px; justify-self: center; }
+.final3 .tp3 h2 { margin-bottom: 4px; }
+.final3.wide { grid-template-columns: minmax(280px, 320px) auto; justify-content: center; align-items: start; justify-items: start; gap: 16px; }
+.final3.wide .tp3 { max-width: none; }
+.final3 .g3 { line-height: 0; }
+.keys { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 3px; font: 600 .8rem ui-monospace, Consolas, monospace; }
+.keys i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+@media (max-width: 640px) { .final3 .tp3 .hint { display: none; } .final3 .tp3 { padding: 8px 10px; } .final3 .tp3 h2 { font-size: .95rem; } .keys { font-size: .72rem; margin-top: 4px; } }
+
+.tpc { display: grid; gap: 5px; padding: 8px 0; border-top: 1px solid var(--line); justify-items: start; }
+.tph { font: 700 .82rem ui-monospace, Consolas, monospace; }
+.tph i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.tpr { display: grid; gap: 2px; padding: 4px 0 4px 10px; border-left: 3px solid var(--line); width: 100%; }
+.tpin { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-weight: 600; }
+.tpin .verdict { margin-left: 8px; white-space: nowrap; }
+.tpin .lbl { color: var(--muted); font-size: .82rem; margin-right: 2px; }
+.tpi { display: inline-flex; align-items: center; gap: 3px; }
+.tpin input.num { width: 52px; padding-left: 2px; padding-right: 2px; text-align: center; }
+.tpin .x { width: 30px; min-height: 30px; padding: 0; margin-left: 4px; }
+.eq { font: 700 .85rem ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.verdict { font-weight: 700; font-size: .85rem; }
+.final3.wide .tp3 { max-height: 100%; overflow: auto; }
+@media (max-width: 420px) { .tpin input.num { width: 44px; } .eq { font-size: .78rem; } }
+.eqrow { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.eqrow .x { flex: none; margin: 0; }
+
+/* the app name is the biggest heading on the Home and subject pages; page titles sit below it */
+
+/* ---------- Home page redesign ---------- */
+.app.home { grid-template-rows: auto minmax(0, 1fr); }
+.hh { display: flex; align-items: center; gap: 14px; padding: 10px 4px; flex-wrap: wrap; }
+.brandlink { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); text-decoration: none; font-weight: 800; font-size: 1.45rem; letter-spacing: -.01em; }
+.brandlink .logo { color: var(--accent); }
+.searchbox { flex: 1 1 280px; max-width: 560px; display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); }
+.searchbox:focus-within { border-color: var(--accent); }
+.searchbox input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 8px 0; color: var(--ink); outline: none; min-height: 0; }
+.searchbox input:focus { outline: none; }
+.searchbox kbd { font: 600 .75rem ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; color: var(--muted); background: var(--bg); }
+.hhr { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.ready { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.ready i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+
+.homegrid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-content: start; padding: 4px 0 16px; }
+.homegrid > .subjrow, .homegrid > .results { grid-column: 1 / -1; }
+.homegrid h2 { margin: 0; }
+.small { font-size: .82rem; }
+
+.pick { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; padding: 16px; }
+.pickText { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.pickText h2 { font-size: clamp(1.4rem, 1.6vw + .9rem, 1.9rem); line-height: 1.1; }
+.pickText p { margin: 0; }
+.chipres { justify-self: start; margin-top: 6px; padding: 6px 12px; border-radius: 10px; border: 1.5px solid var(--good); color: var(--good); font: 700 .9rem ui-monospace, Consolas, monospace; background: color-mix(in srgb, var(--good) 10%, var(--card)); }
+.dashes { display: flex; gap: 3px; margin-top: 8px; }
+.dashes i { flex: 1; max-width: 14px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.dashes i.on { background: var(--accent); }
+.pickBtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.preview { position: relative; min-height: 190px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; display: grid; }
+.preview .pv { position: absolute; inset: 0 0 22px 0; padding: 8px; }
+.pvEmpty { display: grid; place-items: center; padding: 16px; }
+.pvEmpty .thumb { width: 70%; max-width: 200px; }
+.pvLabel { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: .75rem; color: var(--muted); }
+
+.savedcard { display: grid; align-content: start; gap: 6px; }
+.seeall { font-size: .84rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+.sl { list-style: none; margin: 4px 0 0; padding: 0; }
+.sl li + li { border-top: 1px solid var(--line); }
+.sl a, .ritem { display: flex; align-items: center; gap: 12px; padding: 9px 2px; color: inherit; text-decoration: none; }
+.sl a:hover .sn b, .ritem:hover b { color: var(--accent); }
+.badge { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: .85rem; }
+.sn, .ritem > span:not(.badge):not(.val) { display: grid; min-width: 0; flex: 1; }
+.sn b, .ritem b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn small, .ritem small { color: var(--muted); font-size: .78rem; }
+.val { font: 700 .88rem ui-monospace, Consolas, monospace; white-space: nowrap; }
+.savedcard .note { margin: 4px 0 0; }
+
+.subjhead { align-items: baseline; margin-bottom: 8px; }
+.subjhead h2 { font-size: 1.25rem; }
+.subjhead h2 a { color: inherit; text-decoration: none; }
+.subjhead h2 small { font-size: .85rem; margin-left: 6px; }
+.path { display: flex; align-items: stretch; gap: 0; }
+.pstep { display: flex; align-items: center; flex: 1 1 0; min-width: 0; }
+.lcardH { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) 76px; gap: 4px 10px; align-items: start; padding: 12px; text-decoration: none; color: inherit; height: 100%; }
+.lcardH:hover { border-color: var(--accent); }
+.lcardH.next { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.lcardH .num { grid-row: 1; width: 22px; height: 22px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: .78rem; }
+.lcardH .lt { grid-column: 2; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.lcardH .lt p { margin: 0; color: var(--muted); font-size: .84rem; }
+.lcardH .thumb { grid-column: 3; grid-row: 1 / span 2; width: 76px; border-radius: 8px; background: var(--bg); }
+.st { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.st.good { color: var(--good); }
+.st.go { color: var(--accent); }
+.arrw { flex: none; width: 34px; height: 22px; margin: 0 2px; }
+.more { flex: 0 0 150px; margin-left: 8px; display: grid; place-content: center; gap: 4px; text-align: center; border-style: dashed; background: transparent; color: var(--muted); }
+
+.results h2 { margin: 6px 0; font-size: 1rem; }
+.rl { display: grid; gap: 2px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.ritem .thumb { width: 52px; border-radius: 6px; background: var(--bg); }
+
+@media (max-width: 899px) {
+    .homegrid { grid-template-columns: minmax(0, 1fr); }
+    .path { flex-direction: column; gap: 8px; }
+    .pstep { flex-direction: column; align-items: stretch; }
+    .arrw { display: none; }
+    .more { flex: none; margin: 0; padding: 12px; }
+}
+@media (max-width: 640px) {
+    .hh { gap: 8px; }
+    .searchbox { order: 3; flex: 1 1 100%; max-width: none; }
+    .pick { grid-template-columns: minmax(0, 1fr); }
+    .preview { min-height: 170px; }
+    .brandlink { font-size: 1.3rem; }
+}
+.pick { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
+.pickBtns .btn { padding: 8px 14px; font-size: .9rem; }
+@media (max-width: 640px) { .pick { grid-template-columns: minmax(0, 1fr); } }
+.lcardH.soon { opacity: .75; cursor: default; }

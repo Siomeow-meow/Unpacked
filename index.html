@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <meta name="theme-color" content="#3b5bdb">
+        <title>Unpacked</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Unpacked">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="description" content="Step-by-step lessons that show where every number comes from. Works offline.">
+        <script>document.documentElement.className = 'booting'; setTimeout(function () { document.documentElement.className = ''; }, 2500);</script>
+        <script>
+            /* if the app never started (for example a stale offline cache), explain instead of showing a blank page */
+            setTimeout(function () {
+                var r = document.getElementById('root');
+                if (!r || r.children.length) return;
+                document.documentElement.className = '';
+                r.innerHTML = '<div style="font:16px/1.5 system-ui,sans-serif;max-width:520px;margin:12vh auto;padding:0 20px;color:#1c2030"><h2>Unpacked could not start</h2><p>The app files did not load. This usually means an old offline cache. Your saved problems are not touched.</p><button id="fixBtn" style="font:inherit;font-weight:700;padding:10px 18px;border-radius:10px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;cursor:pointer">Clear the offline cache and reload</button></div>';
+                document.getElementById('fixBtn').onclick = function () {
+                    var done = function () { location.reload(); };
+                    var regs = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations() : Promise.resolve([]);
+                    regs.then(function (rs) { return Promise.all(rs.map(function (x) { return x.unregister(); })); })
+                        .then(function () { return window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }) : 0; })
+                        .then(done, done);
+                };
+            }, 5000);
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>
