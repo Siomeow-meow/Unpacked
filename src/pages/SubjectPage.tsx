@@ -90,7 +90,7 @@ export default function SubjectPage() {
             </header>
 
             <main><section className="pane">
-                <div className={'homegrid' + (subject.sections && subject.sections.length > 1 ? ' multi' : '')}>
+                <div className={'homegrid multi'}>
                     {query ? (
                         <section className="card results">
                             <h2>Lessons</h2>
@@ -164,7 +164,7 @@ export default function SubjectPage() {
                                             <h2>{s.title} <small>{s.blurb}</small></h2>
                                             <span className="muted small">{s.lessons.filter(l => progress[l.id]).length} of {s.lessons.length} lessons tried</span>
                                         </div>
-                                        <div className={'path' + (s.lessons.length > 4 ? ' many' : '')}>
+                                        <div className={'path many'}>
                                             {s.lessons.map((l, i) => (
                                                 <div key={l.id} className="pstep">
                                                     {l.soon ? (

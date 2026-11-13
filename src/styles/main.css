@@ -504,6 +504,7 @@ a.mcard:hover { border-color: var(--sc); }
 /* ---------- course cards on the main page: short, the same size, and the list fades out at the bottom (it does not show every lesson) ---------- */
 .mrow { min-height: 0; align-items: flex-start; }
 .mcovers { align-items: flex-start; }
+@media (max-width: 700px) { .mrow, .mcovers { align-items: stretch; } }   /* phone: every course card is the full width, not as wide as its own text */
 .mcard .lrows, .mcard .lrows.many { flex: none; height: 148px; overflow: hidden; align-content: start; padding-bottom: 0;
     -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%); }
 .mcard .lfoot { margin-top: 0; padding: 4px 20px 14px; }
