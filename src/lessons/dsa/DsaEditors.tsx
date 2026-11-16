@@ -7,21 +7,30 @@ import type { DsaLessonDef, Snippet } from './lessons';
 import { DsaViz } from './DsaViz';
 import { PracticeButtons, PracticeCode, PracticePane, PracticeStart, TestsPanel, type PracticeApi } from './Practice';
 import { editKey } from '../../lib/codeEdit';
+import { highlightC } from '../../lib/codeHighlight';
+import { FileTabsBar } from '../../components/FileTabsBar';
 
-export interface Session { file: string; idx: number; edits: Record<string, string>; input: string }
-export type Run = ReturnType<typeof runC> & { src: string };
+export interface Session { file: string; idx: number; edits: Record<string, string>; input: string; eof?: boolean; files?: { id: string; label: string }[] }
+/** where each file starts in the one program that is run: lines start+1 ... start+count belong to the file */
+export interface FileSpan { id: string; label: string; start: number; count: number }
+export type Run = ReturnType<typeof runC> & { src: string; map: FileSpan[] };
 
 export interface DsaCtxValue {
     def: DsaLessonDef | null;
     cur: Snippet;
     sess: Session; setSess: Dispatch<SetStateAction<Session>>;
-    source: string; edited: boolean; onEdit: (v: string) => void; reset: () => void;
+    /** the Code visualizer's files (tabs) */
+    tabs: { id: string; label: string }[]; pickFile: (id: string) => void; addFile: () => void; closeFile: (id: string) => void; renameFile: (id: string, label: string) => void;
+    /** the whole program that is run (all the files together); shown = the text of the open file */
+    source: string; shown: string; at: (line: number) => FileSpan | undefined; label: (line: number) => string; edited: boolean; onEdit: (v: string) => void; reset: () => void;
     editing: boolean; setEditing: Dispatch<SetStateAction<boolean>>;
     run: Run | null; trace: Trace | undefined; steps: Trace['steps']; step: Trace['steps'][number] | undefined;
     compileErr: { line?: number; message?: string } | null; statusOk: boolean;
     idx: number; last: number; go: (i: number) => void; prev: Snapshot | null; usesHeap: boolean;
     lines: string[]; callLines: number[]; outText: string;
     nav: RefObject<{ go: (i: number) => void; idx: number; last: number }>;
+    /** the program is waiting for input (scanf / getchar): send a typed line, end the input (Ctrl+D), or forget all the input given so far */
+    waiting: boolean; sendInput: (text: string) => void; endInput: () => void; clearInput: () => void;
     /** the exercises of this lesson (null when it has none); wide = the Test cases can be their own panel; openTests puts that panel on screen */
     practice: PracticeApi | null; wide: boolean; openTests: () => void;
     /** About or Practice: kept here so it survives a panel being rebuilt when the layout changes */
@@ -36,20 +45,20 @@ export const EDITORS: Record<EditorName, { label: string; category: string }> = 
     code: { label: 'Code', category: 'Program' },
     steps: { label: 'Steps', category: 'Program' },
     output: { label: 'Output', category: 'Run' },
-    compiler: { label: 'Compiler & Input', category: 'Run' },
+    compiler: { label: 'Compiler', category: 'Run' },
     about: { label: 'About', category: 'Learn' },
     practice: { label: 'Practice', category: 'Learn' },
     tests: { label: 'Test cases', category: 'Learn' }
 };
 /** A lesson is About, Practice (the options, the description and the buttons), Code (the program you work on) and Test cases. Steps, Output and
-    Compiler & Input belong to the Code visualizer, which is the only place that runs code step by step. */
+    Compiler belong to the Code visualizer, which is the only place that runs code step by step. */
 export const allowedEditors = (isLesson: boolean, hasPractice = false): EditorName[] => (isLesson ? (['about', ...(hasPractice ? ['practice', 'code', 'tests'] : [])] as EditorName[]) : ['code', 'steps', 'output', 'compiler']);
 
 /* ---------- Code ---------- */
 export function CodeEditor() {
     const c = useDsa();
     const gut = useRef<HTMLDivElement>(null), hl = useRef<HTMLDivElement>(null);
-    const ta = useRef<HTMLTextAreaElement>(null), sel = useRef<[number, number] | null>(null);
+    const ta = useRef<HTMLTextAreaElement>(null), sel = useRef<[number, number] | null>(null), syn = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => { if (sel.current && ta.current) { ta.current.setSelectionRange(sel.current[0], sel.current[1]); sel.current = null; } });   // put the cursor back after a Tab or Enter edit
     /* Tab indents, Shift+Tab outdents, Enter keeps the indentation (Escape, then Tab, moves the focus on for keyboard users) */
     const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -66,10 +75,13 @@ export function CodeEditor() {
     const fresh = !!c.run && c.run.src === c.source;
     const lit: { n: number; kind: string }[] = [];
     if (fresh) {
-        if (c.compileErr && c.compileErr.line) lit.push({ n: c.compileErr.line, kind: 'err' });
+        /* a line of the whole program is lit here only when it is in the open file */
+        const loc = (n: number) => { const m = c.at(n); return m ? (m.id === c.sess.file ? n - m.start : 0) : n; };
+        const add = (n: number, kind: string) => { const l = loc(n); if (l > 0) lit.push({ n: l, kind }); };
+        if (c.compileErr && c.compileErr.line) add(c.compileErr.line, 'err');
         else {
-            c.callLines.forEach(n => lit.push({ n, kind: 'call' }));
-            if (c.step) lit.push({ n: c.step.line, kind: c.step.error ? 'err' : 'cur' });
+            c.callLines.forEach(n => add(n, 'call'));
+            if (c.step) add(c.step.line, c.step.error ? 'err' : 'cur');
         }
     }
     const focus = lit.length ? lit[lit.length - 1].n : 0;
@@ -84,23 +96,32 @@ export function CodeEditor() {
         const st = e.currentTarget.scrollTop;
         if (gut.current) gut.current.scrollTop = st;
         if (hl.current) hl.current.style.transform = 'translateY(' + -st + 'px)';
+        if (syn.current) syn.current.style.transform = 'translate(' + -e.currentTarget.scrollLeft + 'px,' + -st + 'px)';
     };
     return (
         <div className="edroot dleft-in">
-            <div className="dtabs">
-                <span className="ftab">{c.cur.label}{c.edited ? ' •' : ''}</span>
+            <div className={'dtabs' + (c.def ? '' : ' hasfiles')}>
+                {c.def ? <span className="ftab">{c.cur.label}{c.edited ? ' •' : ''}</span> : <FileTabs />}
                 <span className="dsp" />
                 {!fresh && <span className="muted small">changed: press Run</span>}
                 {c.edited && <button type="button" className="btn small" onClick={c.reset}>Reset</button>}
             </div>
             <div className="edwrap">
                 <div className="hlayer" aria-hidden="true"><div ref={hl}>{lit.map((l, i) => <i key={i} className={'hl ' + l.kind} style={{ '--ln': l.n - 1 } as React.CSSProperties} />)}</div></div>
-                <div className="edgut" ref={gut} aria-hidden="true">{c.source.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}</div>
-                <textarea ref={ta} className="srcedit" spellCheck={false} wrap="off" value={c.source} onChange={e => c.onEdit(e.target.value)} onKeyDown={onKey}
-                    onScroll={onScroll} aria-label="C source code" />
+                <div className="edgut" ref={gut} aria-hidden="true">{c.shown.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}</div>
+                <div className="srcwrap">
+                    <div className="synlayer" aria-hidden="true"><div ref={syn} dangerouslySetInnerHTML={{ __html: highlightC(c.shown) }} /></div>
+                    <textarea ref={ta} className="srcedit" spellCheck={false} wrap="off" value={c.shown} onChange={e => c.onEdit(e.target.value)} onKeyDown={onKey}
+                        onScroll={onScroll} aria-label="C source code" />
+                </div>
             </div>
         </div>
     );
+}
+
+function FileTabs() {
+    const c = useDsa();
+    return <FileTabsBar tabs={c.tabs} active={c.sess.file} edited={c.edited} onPick={c.pickFile} onAdd={c.addFile} onClose={c.closeFile} onRename={c.renameFile} />;
 }
 
 /* ---------- Steps: the explanation, the call stack and the heap (one scrolling picture, so the arrows always stay with the boxes) ---------- */
@@ -126,7 +147,7 @@ export function StepsEditor() {
     return (
         <section className="dright edroot" ref={root}>
             {c.compileErr ? (
-                <div className="dstep"><h2><span className="n bad">!</span>The code does not compile</h2><p>Line <b>{c.compileErr.line}</b>: {c.compileErr.message}</p><p className="muted">Fix it in the editor, then press Run.</p></div>
+                <div className="dstep"><h2><span className="n bad">!</span>The code does not compile</h2><p><b>{c.label(c.compileErr.line ?? 0).replace(/^l/, 'L')}</b>: {c.compileErr.message}</p><p className="muted">Fix it in the editor, then press Run.</p></div>
             ) : step ? (
                 <>
                     <div className="dstep">
@@ -150,7 +171,7 @@ export function StepBar() {
         <nav className="bar dbar" aria-label="Steps">
             <button className="btn nav first" type="button" aria-label="First step" title="First step" disabled={idx === 0} onClick={() => go(0)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.5 6l-6 6 6 6M18.5 6l-6 6 6 6" /></svg></button>
             <button className="btn nav back" type="button" aria-label="Previous step" title="Previous step" disabled={idx === 0} onClick={() => go(idx - 1)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
-            <span className="prog" aria-live="polite">{steps.length ? 'Step ' + (Math.min(idx, last) + 1) + ' of ' + steps.length + (step ? ' · line ' + step.line : '') : 'No steps'}</span>
+            <span className="prog" aria-live="polite">{steps.length ? 'Step ' + (Math.min(idx, last) + 1) + ' of ' + steps.length + (step ? ' · ' + c.label(step.line) : '') : 'No steps'}</span>
             <button className="btn nav primary dnext next" type="button" aria-label="Next step" title="Next step" disabled={idx >= last} onClick={() => go(idx + 1)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
             <button className="btn nav last" type="button" aria-label="Last step" title="Last step" disabled={idx >= last} onClick={() => go(last)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 6l6 6-6 6M12.5 6l6 6-6 6" /></svg></button>
         </nav>
@@ -161,24 +182,31 @@ export function StepBar() {
 export function OutputEditor() {
     const c = useDsa();
     const { step, compileErr } = c;
+    const [line, setLine] = useState('');
+    const box = useRef<HTMLInputElement>(null);
+    const ask = c.waiting && c.idx >= c.last;      // the program is stopped at a scanf and you are looking at that step
+    useEffect(() => { if (ask) box.current?.focus(); }, [ask, c.steps.length]);
+    const send = () => { c.sendInput(line); setLine(''); };
     return (
-        <pre className="dout edroot"><span className="muted">$ cc {c.cur.id.replace(/-/g, '_')} -o run (in your browser, offline)</span>{'\n'}{c.statusOk ? <span className="good">✓ compiled</span> : <span className="bad">✗ not compiled</span>}{step && !compileErr ? '\n' + (step.kind === 'end' ? 'program finished' : 'paused at line ' + step.line + ' (step ' + step.n + ')') + '\n' : '\n'}{c.outText}<span className="caret">▌</span></pre>
+        <div className="edroot outwrap">
+        <pre className="dout edroot" onClick={() => { if (ask && !window.getSelection()?.toString()) box.current?.focus(); }}><span className="muted">$ cc {c.cur.id.replace(/-/g, '_')} -o run (in your browser, offline)</span>{'\n'}{c.statusOk ? <span className="good">✓ compiled</span> : <span className="bad">✗ not compiled</span>}{step && !compileErr ? '\n' + (step.kind === 'end' ? 'program finished' : 'paused at ' + c.label(step.line) + ' (step ' + step.n + ')') + '\n' : '\n'}{c.outText}{ask
+            ? <input ref={box} className="inl" value={line} size={Math.max(1, line.length + 1)} onChange={e => setLine(e.target.value)} aria-label="Input for scanf" autoComplete="off" spellCheck={false}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(); } else if (e.key === 'd' && e.ctrlKey) { e.preventDefault(); c.endInput(); } }} />
+            : <span className="caret">▌</span>}</pre>
+        {ask && <div className="stdin note"><span className="muted">Type the input right here and press Enter.</span><button type="button" className="btn small" onClick={c.endInput} title="End of input (Ctrl+D): scanf then returns EOF">End input</button></div>}
+        {!ask && c.sess.input && !c.def && <div className="stdin note"><span className="muted">The input given so far is used again each time you press Run.</span><button type="button" className="btn small" onClick={c.clearInput}>Clear input</button></div>}
+        </div>
     );
 }
 
 /* ---------- Compiler and Input ---------- */
 export function CompilerEditor() {
     const c = useDsa();
-    const [tab, setTab] = useState<'cc' | 'in'>('cc');
     return (
         <div className="edroot">
-            <div className="dtabs small">
-                <button type="button" className={tab === 'cc' ? 'on' : ''} onClick={() => setTab('cc')}>Compiler</button>
-                <button type="button" className={tab === 'in' ? 'on' : ''} onClick={() => setTab('in')}>Input</button>
-            </div>
-            {tab === 'cc'
-                ? <pre className="dout">{c.compileErr ? <span className="bad">line {c.compileErr.line}: error: {c.compileErr.message}</span> : <span className="good">0 errors. The program is run by Unpacked&apos;s own C interpreter (a large part of C: structs, pointers, malloc, loops, functions). Unsupported things are reported as errors with the line.</span>}</pre>
-                : <textarea className="dout inin" placeholder="Text for scanf / getchar goes here, then press Run" value={c.sess.input} onChange={e => c.setSess(s => ({ ...s, input: e.target.value }))} aria-label="Program input" />}
+            {true
+                ? <pre className="dout">{c.compileErr ? <span className="bad">{c.label(c.compileErr.line ?? 0)}: error: {c.compileErr.message}</span> : <span className="good">0 errors. The program is run by Unpacked&apos;s own C interpreter (a large part of C: structs, pointers, malloc, loops, functions). Unsupported things are reported as errors with the line.</span>}</pre>
+                : null}
         </div>
     );
 }

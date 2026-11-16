@@ -158,9 +158,6 @@ a.mcard:hover { border-color: var(--sc); }
 .dh1 { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .dh1 h1 { font-size: clamp(1.05rem, 1vw + .8rem, 1.4rem); white-space: normal; }
 .dh2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.dstat { display: inline-flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--muted); white-space: nowrap; }
-.dstat i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
-.dstat.bad i { background: var(--bad); } .dstat.bad { color: var(--bad); }
 .runbtn { background: var(--s-dsa); color: var(--s-dsa-on); border-color: var(--s-dsa); font-weight: 800; }
 .runbtn:hover { filter: brightness(1.06); border-color: var(--s-dsa); }
 .dpanes { display: none; }
@@ -220,6 +217,16 @@ a.mcard:hover { border-color: var(--sc); }
 .w { border-color: var(--good) !important; background: color-mix(in srgb, var(--good) 16%, transparent); }
 .minia { display: inline-flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
 .minia em { font-size: .7rem; color: var(--muted); align-self: center; }
+.mc.ch { display: inline-flex; flex-direction: column; align-items: center; padding: 1px 3px 0; min-width: 24px; }
+.mc.ch small { font: 500 .58rem system-ui, sans-serif; color: var(--muted); }
+.mc.nul { color: var(--muted); }
+.outwrap { flex: 1 1 0; min-height: 0; }
+.outwrap > .dout { display: block; flex: 1 1 0; min-height: 0; overflow: auto; }
+.stdin { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--line); }
+/* the input is typed right after the printed text, where the cursor is */
+.dout input.inl, .dout input.inl:focus { font: inherit; color: var(--ink); background: none; border: 0; outline: none; padding: 0; margin: 0; min-width: 1ch; max-width: 100%; caret-color: var(--s-dsa); box-shadow: none; border-radius: 0; }
+.stdin.note { font-size: .76rem; justify-content: space-between; }
+.strptr { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .mc { min-width: 22px; text-align: center; font: 700 .72rem ui-monospace, Consolas, monospace; border: 1.5px solid var(--line); border-radius: 4px; padding: 1px 3px; font-style: normal; }
 .blk { border: 1.5px solid var(--line); border-radius: 10px; padding: 6px 8px; background: var(--bg); }
 .blk.freed { opacity: .55; border-style: dashed; }
@@ -354,6 +361,22 @@ a.mcard:hover { border-color: var(--sc); }
 .dtabs { height: 46px; flex-wrap: nowrap; overflow: hidden; }
 .dtabs .ftab { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dtabs .btn { flex: none; white-space: nowrap; min-height: 30px; }
+.dtabs .ftabs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.dtabs.hasfiles { padding: 0 8px; align-items: flex-end; gap: 4px; overflow: visible; }
+.dtabs.hasfiles .ftabs { align-items: flex-end; align-self: flex-end; overflow-x: auto; overflow-y: hidden; padding-top: 6px; }
+.ftb { display: flex; align-items: center; flex: none; max-width: 190px; height: 32px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; position: relative; }
+.ftb:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.ftb.on { background: var(--card); border-color: var(--line); box-shadow: inset 0 2px 0 var(--s-dsa); }
+.ptabs { margin: 0 -2px; }
+.dtabs.hasfiles > :not(.ftabs) { align-self: center; }
+.dtabs.hasfiles > .dsp { align-self: stretch; }
+.ftb .ftl { background: none; border: 0; padding: 6px 4px 6px 10px; font: 700 .8rem ui-monospace, Consolas, monospace; color: var(--muted); cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftb.on .ftl { color: var(--s-dsa-ink, var(--ink)); }
+.ftb .ftx { background: none; border: 0; color: var(--muted); font-size: 1rem; line-height: 1; padding: 4px 8px 4px 2px; cursor: pointer; border-radius: 6px; }
+.ftb .ftx:hover { color: var(--ink); }
+.ftb .ftn { font: 700 .8rem ui-monospace, Consolas, monospace; width: 120px; margin: 3px 4px 3px 6px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--s-dsa); background: var(--card); color: var(--ink); }
+.ftplus { flex: none; width: 28px; height: 28px; margin: 0 0 3px 2px; border-radius: 8px; border: 0; background: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.ftplus:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .dtabs.small { height: auto; }
 .codeview { padding: 4px 0; }
 .edwrap { flex: 1 1 0; min-height: 0; display: flex; overflow: hidden; }
@@ -504,6 +527,7 @@ a.mcard:hover { border-color: var(--sc); }
 /* ---------- course cards on the main page: short, the same size, and the list fades out at the bottom (it does not show every lesson) ---------- */
 .mrow { min-height: 0; align-items: flex-start; }
 .mcovers { align-items: flex-start; }
+@media (max-width: 700px) { .mrow, .mcovers { align-items: stretch; } }   /* phone: every course card is the full width, not as wide as its own text */
 .mcard .lrows, .mcard .lrows.many { flex: none; height: 148px; overflow: hidden; align-content: start; padding-bottom: 0;
     -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%); }
 .mcard .lfoot { margin-top: 0; padding: 4px 20px 14px; }
@@ -605,6 +629,12 @@ a.mcard:hover { border-color: var(--sc); }
 .edwrap .hl.err { background: color-mix(in srgb, var(--bad) 20%, transparent); box-shadow: inset 3px 0 0 var(--bad); }
 .edwrap .edgut { position: relative; }
 .edwrap .srcedit { position: relative; background: transparent; }
+/* comments are lighter: the text is drawn in a layer under a transparent textarea (same font and padding, scrolled together) */
+.srcwrap { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
+.srcwrap > .srcedit { width: 100%; height: 100%; color: transparent; caret-color: var(--ink); }
+.srcwrap > .srcedit::selection { background: color-mix(in srgb, var(--s-dsa) 35%, transparent); }
+.synlayer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; padding: 4px 0; font: .82rem/1.55 ui-monospace, Consolas, monospace; white-space: pre; tab-size: 4; color: var(--ink); }
+.synlayer .cm { color: color-mix(in srgb, var(--muted) 85%, transparent); }
 
 /* lesson card titles never break inside a word: the title gets more of the picture and its size follows the width of the card */
 .app.home .lcardH .lvis { container-type: inline-size; }

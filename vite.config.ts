@@ -17,8 +17,8 @@ export default defineConfig({
                 name: 'Unpacked',
                 short_name: 'Unpacked',
                 description: 'Step-by-step lessons that show where every number comes from. Works offline.',
-                theme_color: '#3b5bdb',
-                background_color: '#f5f6fa',
+                theme_color: '#14161d',
+                background_color: '#14161d',
                 display: 'standalone',
                 categories: ['education'],
                 icons: [

@@ -1,6 +1,6 @@
 /* The picture of the machine at one step: the call stack (one card per running function) and the heap (one card per
    malloc block), with an arrow from every pointer to what it points at. */
-import { Fragment, useLayoutEffect, useMemo, useRef } from 'react';
+import { Fragment, createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { fmtAddr } from '../../lib/c/machine';
 import type { BlockView, Cell, Snapshot } from '../../lib/c/machine';
 
@@ -38,8 +38,29 @@ function Value({ c, inv }: { c: Cell; inv: Inv | null }) {
     return <span className="vbox" data-a={c.addr} data-s={c.size}><Inner c={c} inv={inv} /><small className="vaddr">{hex(c.addr)}</small></span>;
 }
 
+/** the characters of a text, one box each, with the index under it: a char array, or what a char* points to */
+function CharRow({ chars, cells, more, text }: { chars: string[]; cells?: Cell[]; more: number; text?: string }) {
+    return (
+        <span className="minia vb chrow" title={text !== undefined ? '"' + text + '"' : undefined}>
+            {chars.map((ch, i) => (
+                <i key={i} className={'mc ch' + (ch === '\\0' ? ' nul' : '') + (cells ? rwClass(cells[i]) + (cells[i].init ? '' : ' un') : '')} data-a={cells ? cells[i].addr : undefined} data-s={cells ? 1 : undefined}>
+                    {ch}<small>{i}</small>
+                </i>
+            ))}
+            {more > 0 && <em>+{more}</em>}
+        </span>
+    );
+}
+
 function Inner({ c, inv }: { c: Cell; inv: Inv | null }) {
-    if (c.kind === 'ptr' && c.init && c.target) return <span className="vb ptrv" data-target={c.target} data-pid={c.id} data-hot={inv && inv.ptr.get(c.id) !== c.target ? '1' : undefined}>→ {c.text}</span>;
+    if (c.kind === 'ptr' && c.init && c.target) {
+        const arrow = <span className="vb ptrv" data-target={c.target} data-pid={c.id} data-hot={inv && inv.ptr.get(c.id) !== c.target ? '1' : undefined}>→ {c.text}</span>;
+        if (!c.chars) return arrow;
+        return <span className="strptr">{arrow}<CharRow chars={c.chars} more={c.more || 0} text={c.strText} /></span>;
+    }
+    if (c.kind === 'array' && c.children && c.strText !== undefined) {
+        return <CharRow chars={c.children.map(ch => ch.text)} cells={c.children} more={c.more || 0} text={c.strText} />;
+    }
     if (c.kind === 'array' && c.children) {
         return (
             <span className="minia vb">
@@ -86,15 +107,19 @@ function Block({ b, inv }: { b: BlockView; inv: Inv | null }) {
     );
 }
 
+/** how a line is named: "line 12", or "file2.c line 3" when the program has several files (set by the lesson page) */
+export const LineLabelCtx = createContext<(n: number) => string>(n => 'line ' + n);
+
 /* ---------- the call stack, and the heap: two separate views that can live in different panels ---------- */
 export function StackView({ snap, prev }: { snap: Snapshot; prev?: Snapshot | null }) {
     const inv = useMemo(() => (prev ? inventory(prev) : null), [prev]);
+    const label = useContext(LineLabelCtx);
     return (
         <div className="dcol sv">
             <h4>Call stack</h4>
             {snap.frames.map((f, i) => (
                 <div key={i} className={'frame' + (i === 0 ? ' run' : '')}>
-                    <div className="fh"><b>{f.fn}()</b><span>{i === 0 ? 'running' : 'waiting'} · line {f.line}</span></div>
+                    <div className="fh"><b>{f.fn}()</b><span>{i === 0 ? 'running' : 'waiting'} · {label(f.line)}</span></div>
                     {f.vars.length ? <VarRows cells={f.vars} inv={inv} /> : <div className="vrow none">no variables yet</div>}
                 </div>
             ))}

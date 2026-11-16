@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { buildSteps, parseFr, type SimplexProblem, type SimplexStep } from '../../lib/simplex/solver';
 import { clamp, clone, esc } from '../../lib/util';
 import { Select } from '../../components/Select';
-import { ExamplesList, SavedProblems } from '../../components/SavedProblems';
+import { SavedProblems } from '../../components/SavedProblems';
 import { LessonShell } from '../../components/LessonShell';
 import { StepCard } from '../../components/StepCard';
 import { useLesson, type LessonConfig } from '../../components/useLesson';
@@ -172,14 +172,11 @@ export default function SimplexLesson() {
             </section>
 
             <section className="card" id="saves">
-                <ExamplesList
-                    items={[
+                <SavedProblems<SimplexProblem> examples={[
                         { key: 'max', name: 'Max: Default', meta: 'Max' },
                         { key: 'min', name: 'Min: Default', meta: 'Min' },
                         { key: 'mixed', name: 'Max with ≤, ≥ and =', meta: 'Max' }
-                    ]}
-                    onLoad={k => L.loadProblem(SIMPLEX_EXAMPLES[k as SimplexExampleKey])} />
-                <SavedProblems<SimplexProblem> lesson="simplex" problem={P} isValid={validProblem} fileName="simplex-problems.json"
+                    ]} onExample={k => L.loadProblem(SIMPLEX_EXAMPLES[k as SimplexExampleKey])} lesson="simplex" problem={P} isValid={validProblem} fileName="simplex-problems.json"
                     meta={p => (p.mode === 'max' ? 'Max' : 'Min')} onLoad={L.loadProblem} onError={L.setErr} />
             </section>
         </div>

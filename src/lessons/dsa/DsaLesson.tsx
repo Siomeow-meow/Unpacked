@@ -5,7 +5,6 @@
    arrows always stay with the boxes they connect. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Select } from '../../components/Select';
 import { nextLessonOf } from '../../subjects';
 import { runC, type Trace } from '../../lib/c/machine';
 import { KEYS, recordProgress, store } from '../../lib/storage';
@@ -15,16 +14,23 @@ import { openBeside } from '../../lib/layout';
 import { PLAYGROUND_ID, PLAYGROUND_STARTER, dsaLesson, type Snippet } from './lessons';
 import {
     AboutEditor, CodeEditor, CompilerEditor, DsaCtx, EDITORS, OutputEditor, StepBar, StepsEditor, allowedEditors, renderEditor,
-    type DsaCtxValue, type EditorName, type Run, type Session
+    type DsaCtxValue, type EditorName, type FileSpan, type Run, type Session
 } from './DsaEditors';
+import { LineLabelCtx } from './DsaViz';
 import { Workspace } from './workspace/Workspace';
+import { cleanFileName, nextFileName } from '../../components/FileTabsBar';
 import { useWorkspace } from './workspace/useWorkspace';
 
-const PLAY_FILE: Snippet = { id: 'playground.c', label: 'Your code', src: PLAYGROUND_STARTER, about: '', watch: [] };
-const loadSession = (lessonId: string, files: Snippet[]): Session => {
+const MAIN_ID = 'playground.c';
+const NEW_FILE_SRC = '#include <stdio.h>\n\n// This file only runs when main.c has the line:  #include "NAME"\n// (with this file name). Only one file has main().\n';
+const loadSession = (lessonId: string, snippets: Snippet[] | null): Session => {
     const s = store.get<Partial<Session> | null>(KEYS.lesson(lessonId), null);
-    const file = s && s.file && files.some(f => f.id === s.file) ? s.file : files[0].id;
-    return { file, idx: s?.idx || 0, edits: s?.edits && typeof s.edits === 'object' ? s.edits : {}, input: s?.input || '' };
+    /* the Code visualizer keeps its own list of files; a lesson has its fixed snippets */
+    const saved = Array.isArray(s?.files) ? s!.files!.filter(f => f && typeof f.id === 'string' && typeof f.label === 'string') : [];
+    const tabs = snippets ? undefined : (saved.length ? saved : [{ id: MAIN_ID, label: 'main.c' }]);
+    const ids = snippets ? snippets.map(f => f.id) : tabs!.map(f => f.id);
+    const file = s && s.file && ids.includes(s.file) ? s.file : ids[0];
+    return { file, idx: s?.idx || 0, edits: s?.edits && typeof s.edits === 'object' ? s.edits : {}, input: s?.input || '', ...(tabs ? { files: tabs } : {}) };
 };
 
 /** true on a window wide enough for the splittable workspace */
@@ -42,11 +48,34 @@ function useWide(): boolean {
 
 export default function DsaLesson({ lessonId }: { lessonId: string }) {
     const def = lessonId === PLAYGROUND_ID ? null : dsaLesson(lessonId) ?? null;
-    const files: Snippet[] = def ? def.snippets : [PLAY_FILE];
-    const [sess, setSess] = useState(() => loadSession(lessonId, files));
+    const [sess, setSess] = useState(() => loadSession(lessonId, def ? def.snippets : null));
+    const tabs = sess.files ?? [{ id: MAIN_ID, label: 'main.c' }];
+    const files: Snippet[] = def ? def.snippets : tabs.map(f => ({ id: f.id, label: f.label, src: f.id === MAIN_ID ? PLAYGROUND_STARTER : NEW_FILE_SRC, about: '', watch: [] }));
     const cur = files.find(f => f.id === sess.file) || files[0];
     const original = cur.src;
-    const source = sess.edits[sess.file] ?? original;
+    const own = sess.edits[sess.file] ?? original;     // the text of the open file
+    /* The Code visualizer runs the first file (main.c) together with the files it asks for with #include "name" (like C does).
+       A file that is not included is not part of the program. A line number of the program is turned back into a file and a
+       line with the map. A lesson has just the one snippet. */
+    const build = (edits: Record<string, string>): { src: string; map: FileSpan[] } => {
+        if (def) return { src: edits[cur.id] ?? cur.src, map: [] };
+        const order: Snippet[] = [], seen = new Set<string>();
+        const visit = (f: Snippet) => {
+            if (seen.has(f.id)) return;
+            seen.add(f.id);
+            const t = edits[f.id] ?? f.src;
+            for (const m of t.matchAll(/^[ \t]*#[ \t]*include[ \t]*"([^"\n]+)"/gm)) {
+                const dep = files.find(x => x.label === m[1].trim());
+                if (dep) visit(dep);
+            }
+            order.push(f);      // what a file includes comes before it
+        };
+        visit(files[0]);
+        let start = 0; const map: FileSpan[] = [], parts: string[] = [];
+        order.forEach(f => { const t = edits[f.id] ?? f.src, count = t.split('\n').length; map.push({ id: f.id, label: f.label, start, count }); parts.push(t); start += count; });
+        return { src: parts.join('\n'), map };
+    };
+    const source = def ? own : build(sess.edits).src;
     const [run, setRun] = useState<Run | null>(null);
     const [idx, setIdx] = useState(sess.idx);
     const [editing, setEditing] = useState(false);
@@ -64,17 +93,17 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
 
     const from = useRef(-9);      // where the last Next/Back started: only a single step forward is animated
     /** `resume`: the lesson was just opened. One that was left at its very last step starts again from step 1. */
-    const doRun = useCallback((src: string, keep?: number, resume = false) => {
-        const r = runC(src, { input: sess.input });
-        setRun({ ...r, src });
+    const doRun = useCallback((b: { src: string; map: FileSpan[] }, keep?: number, resume = false, ov?: { input: string; eof: boolean }) => {
+        const r = runC(b.src, { input: ov ? ov.input : sess.input, eof: ov ? ov.eof : !!sess.eof, interactive: true });
+        setRun({ ...r, src: b.src, map: b.map });
         const n = r.trace ? r.trace.steps.length : 0;
         from.current = -9;
         const start = resume && keep !== undefined && n > 1 && keep >= n - 1 ? 0 : keep;
         setIdx(i => Math.max(0, Math.min(start ?? i, n - 1)));
         setEditing(false);
-    }, [sess.input]);
-    // first run, and a run whenever another file is chosen
-    useEffect(() => { if (!def) doRun(source, sess.idx, true); }, [sess.file]);   // eslint-disable-line react-hooks/exhaustive-deps
+    }, [sess.input, sess.eof]);
+    // the first run (choosing another file only changes what is shown; Run runs all the files)
+    useEffect(() => { if (!def) doRun(build(sess.edits), sess.idx, true); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const trace: Trace | undefined = run?.trace;
     const steps = trace?.steps || [];
@@ -110,15 +139,54 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
     const callLines = step ? step.snap.frames.slice(1).map(f => f.line) : [];
     const compileErr = run && !run.compile.ok ? run.compile : null;
     const edited = sess.edits[sess.file] !== undefined && sess.edits[sess.file] !== original;
+    const map = run?.map ?? [];
+    const at = (line: number) => map.find(m => line > m.start && line <= m.start + m.count);
+    const label = (line: number) => { const m = at(line); return m && map.length > 1 ? m.label + ' line ' + (line - m.start) : 'line ' + line; };
+    /* stepping into code of another file (or an error in it) opens that file */
+    useEffect(() => {
+        if (def || map.length < 2 || !run) return;
+        const ln = run.compile.ok ? step?.line : (run.compile as { line?: number }).line;
+        const m = ln ? at(ln) : undefined;
+        if (m && m.id !== sess.file && tabs.some(t => t.id === m.id)) setSess(s => ({ ...s, file: m.id }));
+    }, [idx, run]);   // eslint-disable-line react-hooks/exhaustive-deps
     const outText = trace && step ? trace.output.slice(0, step.outLen) : '';
     const statusOk = run ? run.compile.ok : true;
 
     const setFile = (id: string) => { setIdx(0); setSess(s => ({ ...s, file: id, idx: 0 })); setPane('steps'); };
+    /* the program stopped at a scanf: the typed line is added to the input and the program runs again up to there (and on) */
+    const sendInput = (text: string) => { const input = sess.input + text + '\n'; setSess(s => ({ ...s, input })); doRun(build(sess.edits), idx, false, { input, eof: !!sess.eof }); };
+    const endInput = () => { setSess(s => ({ ...s, eof: true })); doRun(build(sess.edits), idx, false, { input: sess.input, eof: true }); };
+    const clearInput = () => { setSess(s => ({ ...s, input: '', eof: false })); doRun(build(sess.edits), 0, false, { input: '', eof: false }); };
+    const pickFile = (id: string) => { if (id !== sess.file) setFile(id); };
+    const addFile = () => {
+        const id = 'f' + Date.now().toString(36);
+        setIdx(0); setPane('steps');
+        setSess(s => ({ ...s, file: id, idx: 0, files: [...(s.files ?? tabs), { id, label: nextFileName(tabs) }] }));
+    };
+    const closeFile = (id: string) => {
+        if (tabs.length <= 1) return;
+        const t = files.find(f => f.id === id);
+        const dirty = sess.edits[id] !== undefined && t && sess.edits[id] !== t.src;
+        if (dirty && !window.confirm('Close ' + t!.label + '? Its code will be lost.')) return;
+        const at = tabs.findIndex(f => f.id === id), rest = tabs.filter(f => f.id !== id);
+        setSess(s => {
+            const e = { ...s.edits }; delete e[id];
+            const file = s.file === id ? rest[Math.min(at, rest.length - 1)].id : s.file;
+            return { ...s, file, idx: s.file === id ? 0 : s.idx, edits: e, files: rest };
+        });
+        if (id === sess.file) setIdx(0);
+    };
+    const renameFile = (id: string, name: string) => {
+        const v = cleanFileName(name);
+        if (!v) return;
+        if (tabs.some(t => t.id !== id && t.label === v)) return;
+        setSess(s => ({ ...s, files: (s.files ?? tabs).map(f => f.id === id ? { ...f, label: v } : f) }));
+    };
     const onEdit = (v: string) => setSess(s => ({ ...s, edits: { ...s.edits, [s.file]: v } }));
-    const reset = () => { setSess(s => { const e = { ...s.edits }; delete e[s.file]; return { ...s, edits: e }; }); doRun(original, 0); };
+    const reset = () => { const e = { ...sess.edits }; delete e[sess.file]; setSess(s => ({ ...s, edits: e })); doRun(build(e), 0); };
 
     const ctx: DsaCtxValue = {
-        def, cur, sess, setSess, source, edited, onEdit, reset, editing, setEditing, run, trace, steps, step, compileErr, statusOk,
+        def, cur, sess, setSess, waiting: !!run?.trace?.waiting, sendInput, endInput, clearInput, tabs, pickFile, addFile, closeFile, renameFile, source, shown: own, at, label, edited, onEdit, reset, editing, setEditing, run, trace, steps, step, compileErr, statusOk,
         idx, last, go, prev: fwd && idx > 0 ? steps[idx - 1].snap : null, usesHeap: HEAP.test(source), lines, callLines, outText, nav, practice, wide, openTests, aboutTab, setAboutTab
     };
     const next = nextLessonOf(lessonId);
@@ -126,6 +194,7 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
 
     return (
         <DsaCtx.Provider value={ctx}>
+            <LineLabelCtx.Provider value={label}>
             <div className={'app dsa' + (def ? ' lessononly' : '')}>
                 <header className="dh">
                     <div className="dh1">
@@ -135,14 +204,12 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
                         <h1>{def ? def.title : 'Code visualizer'}</h1>
                     </div>
                     <div className="dh2">
-                        {!def && <span className={'dstat' + (statusOk ? ' ok' : ' bad')}><i />{statusOk ? 'Compiled · 0 errors' : '1 error'}</span>}
-                        {!def && files.length > 1 && <Select value={sess.file} ariaLabel="Code snippet" options={files.map(f => ({ value: f.id, label: f.label }))} onChange={setFile} />}
                         {wide && (
                             <span className="lbtns" role="group" aria-label="Panel layout">
                                 <button type="button" className="btn small" onClick={ws.reset} title="Put the panels back as they were at the start">Reset layout</button>
                             </span>
                         )}
-                        {!def && <button type="button" id="runBtn" className="btn runbtn" onClick={() => doRun(source, 0)}>▶ Run</button>}
+                        {!def && <button type="button" id="runBtn" className="btn runbtn" onClick={() => doRun(build(sess.edits), 0)}>▶ Run</button>}
                         {next && <Link to={next.route} className="btn nextlesson" title={'Next lesson: ' + next.name}>Next lesson →</Link>}
                     </div>
                 </header>
@@ -164,7 +231,7 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
                                 <CodeEditor />
                                 <div className={'dbottom' + (btab === 'about' ? ' tall' : '')}>
                                     <div className="dtabs small">
-                                        {(def ? ['about', 'out', 'cc'] as const : ['out', 'cc'] as const).map(t => <button key={t} type="button" className={btab === t ? 'on' : ''} onClick={() => setBtab(t)}>{t === 'about' ? 'About' : t === 'out' ? 'Output' : 'Compiler & Input'}</button>)}
+                                        {(def ? ['about', 'out', 'cc'] as const : ['out', 'cc'] as const).map(t => <button key={t} type="button" className={btab === t ? 'on' : ''} onClick={() => setBtab(t)}>{t === 'about' ? 'About' : t === 'out' ? 'Output' : 'Compiler'}</button>)}
                                     </div>
                                     {btab === 'about' && def ? <AboutEditor /> : btab === 'cc' ? <CompilerEditor /> : <OutputEditor />}
                                 </div>
@@ -175,6 +242,7 @@ export default function DsaLesson({ lessonId }: { lessonId: string }) {
                 )}
                 {!def && <footer className="dfoot"><StepBar /></footer>}
             </div>
+            </LineLabelCtx.Provider>
         </DsaCtx.Provider>
     );
 }

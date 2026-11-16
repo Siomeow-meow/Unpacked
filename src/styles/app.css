@@ -119,11 +119,11 @@ input.bad { border-color: var(--bad); }
 @media (pointer: coarse) { .btn { min-height: 44px; } .btn.small { min-height: 40px; } input, select { min-height: 40px; font-size: 16px; } }
 @media (hover: none) { .btn:hover { border-color: var(--line); } .btn.primary:hover { border-color: var(--accent); } }
 
-#savedList { list-style: none; padding: 0; margin: 10px 0 0; max-height: 28vh; overflow: auto; }
+#savedList { list-style: none; padding: 0; margin: 10px 0 0; max-height: 38vh; overflow: auto; }   /* it scrolls inside the card instead of making the card taller */
+#savedList li.ex { cursor: pointer; }
 #savedList li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); }
 #savedList .nm { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #savedList .meta { color: var(--muted); font-size: .78rem; white-space: nowrap; }
-#savedList:empty::after { content: "Nothing saved yet."; color: var(--muted); font-size: .88rem; }
 
 /* ---------- tab 2: compact problem summary ---------- */
 .summary { display: flex; align-items: center; gap: 8px; height: 36px; }
@@ -263,6 +263,14 @@ svg.arrows { position: absolute; left: 0; top: 0; pointer-events: none; overflow
 #newDlg { width: min(520px, calc(100vw - 24px)); height: min(80dvh, 560px); padding: 0; border: 1px solid var(--line); border-radius: 14px;
     background: var(--card); color: var(--ink); overflow: hidden; }
 #newDlg[open] { display: flex; flex-direction: column; }
+#installDlg { width: min(420px, calc(100vw - 24px)); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); overflow: hidden; }
+#installDlg::backdrop { background: rgba(0, 0, 0, .5); }
+.installBody { padding: 16px; display: grid; gap: 10px; justify-items: start; }
+.installBody img { border-radius: 14px; }
+.installBody p { margin: 0; }
+.installBody ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: .92rem; }
+.installBody .installHow { padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: .92rem; }
+.installActions { display: flex; gap: 8px; justify-content: flex-end; width: 100%; margin-top: 6px; }
 #newDlg::backdrop { background: rgba(0, 0, 0, .5); }
 .dlgHead { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .dlgHead h2 { margin: 0; }
@@ -302,11 +310,7 @@ svg.arrows { position: absolute; left: 0; top: 0; pointer-events: none; overflow
 .fsp { border-radius: 3px; padding: 0 2px; }
 svg.farrows { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 5; overflow: visible; }
 
-#exampleList { list-style: none; padding: 0; margin: 10px 0 0; }
-#exampleList li { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); }
-#exampleList .nm { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#exampleList .meta { color: var(--muted); font-size: .78rem; white-space: nowrap; }
-#saves .h2b { margin-top: 18px; }
+#saves .h2b { margin-top: 0; }
 
 .tbl td.pend .v, .tbl th.pend .v { visibility: hidden; }   /* the result stays hidden until its last arrow has been drawn */
 .saveRow { display: flex; gap: 8px; margin-top: 10px; }
@@ -326,7 +330,7 @@ svg.farrows { position: absolute; left: 0; top: 0; pointer-events: none; z-index
     #form input.nm { width: clamp(34px, 12.5vw, 50px); }
     #form .ddbtn { padding: 4px 3px 4px 4px; min-width: 0; }
     .btn.small { padding: 4px 8px; font-size: .8rem; }
-    #exampleList li, #savedList li { gap: 6px; }
+    #savedList li { gap: 6px; }
     .saveRow .btn { padding-left: 8px; padding-right: 8px; }
     .bar { gap: 4px; }
     .stext { font-size: .8rem; }
@@ -335,4 +339,19 @@ svg.farrows { position: absolute; left: 0; top: 0; pointer-events: none; z-index
 @media (max-width: 280px) {
     .brand .newbtn { padding: 3px 8px; font-size: .75rem; }
     #form input.num, #form input.nm { width: 30px; }
+}
+
+/* ---------- Problem tab: on a wide screen the two cards fill the whole tab (the form on the left, Saved problems on the right, whose list scrolls) ---------- */
+.error:empty { display: none; }
+.svWrap { display: flex; flex-direction: column; min-height: 0; }
+.svWrap .saveRow { flex: none; }
+.svWrap .note { flex: none; margin: 8px 0 0; font-size: .78rem; color: var(--muted); }
+@media (min-width: 900px) {
+    #pane1 { padding-bottom: 8px; }
+    #pane1 .grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr); height: 100%; align-items: stretch; }
+    #pane1 .grid > .card { min-height: 0; min-width: 0; }
+    #pane1 .grid > #setup { overflow: auto; }
+    #pane1 .grid > #saves { display: flex; flex-direction: column; overflow: hidden; }
+    #saves > .svWrap { flex: 1 1 0; }
+    #saves #savedList { flex: 1 1 0; min-height: 0; max-height: none; }
 }

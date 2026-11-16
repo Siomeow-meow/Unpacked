@@ -44,6 +44,7 @@ export const SNIPPET_OUTPUTS: Record<string, string> = {
     "stack-array-malloc.c": "S = 30, 20, 10\nTop element is 30\nPopped element is 30\nS = 20, 10\n",
     "stack-linkedlist.c": "top is 30\npopped 30\npopped 20\ntop is 10\n",
     "queue-circular.c": "1 3 2 5\n1 3 2 5 4\n",
+    "queue-circular-gap.c": "10 20 30 40 50 \ndequeued 10\ndequeued 20\n30 40 50 60 70 \nfront = 3, rear = 1\n",
     "queue-linkedlist.c": "dequeued 1\ndequeued 2\ndequeued 3\n",
     "cursor-basic.c": "10 20 30 \n20 30 \n99 20 30 \n",
     "cursor-vheap.c": "10 -> 5 -> 15\n30 -> 25 -> 5 -> 15\n",

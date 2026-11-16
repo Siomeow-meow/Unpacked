@@ -1,12 +1,12 @@
 /* Transportation Problem (minimize cost): balance with a Dummy, a starting solution (Northwest Corner or Least Cost),
-   a degeneracy test, then MODI until optimal. Exact fractions (the Simplex Fr class), no DOM. */
+   a degeneracy test, then MODI or the Stepping Stone method until optimal. Exact fractions (the Simplex Fr class), no DOM. */
 import { Fr, parseFr } from '../simplex/solver';
 import type { ArrowDef, FormulaArrow, FormulaPart } from '../../components/arrows';
 import type { StepBase } from '../../lessons/types';
 
 export interface TSource { name: string; supply: string }
 export interface TDest { name: string; demand: string }
-export interface TransProblem { method: 'nwc' | 'lc'; cur?: string; sources: TSource[]; dests: TDest[]; cost: string[][] }
+export interface TransProblem { method: 'nwc' | 'lc'; /** how the schedule is improved (default MODI) */ improve?: 'modi' | 'stepping'; cur?: string; sources: TSource[]; dests: TDest[]; cost: string[][] }
 
 export interface TCell { r: number; c: number }
 export interface TTable {
@@ -103,6 +103,13 @@ export function solveTransport(P: TransProblem): TransSolve {
         arrows: (o.arrows as ArrowDef[]) || [], group: o.group || title, table: o.table || null, answer: o.answer || null, gallery: o.gallery, final: o.final
     });
     const plain = (t: string) => ({ formula: t, fparts: [{ t }] as FormulaPart[] });
+    /* a formula in labelled boxes: "Formula:" with the working, and "Final Answer:" only when the step has a result */
+    const NL = String.fromCharCode(10);
+    const FP = (x: string | FormulaPart[]): FormulaPart[] => typeof x === 'string' ? [{ t: x }] : x;
+    const fx = (f: string | FormulaPart[], a?: string | FormulaPart[]) => {
+        const fparts: FormulaPart[] = [{ t: 'Formula:' + NL }, ...FP(f), ...(a ? [{ t: NL + NL + 'Final Answer:' + NL }, ...FP(a)] : [])];
+        return { fparts, formula: fparts.map(x => x.t).join('') };
+    };
 
     interface Snap {
         alloc?: Alloc; left?: TTable['left']; grayR?: number[]; grayC?: number[]; u?: (Fr | null)[]; v?: (Fr | null)[];
@@ -127,7 +134,7 @@ export function solveTransport(P: TransProblem): TransSolve {
         else if (diff.sign > 0) html += '<p>Supply is bigger than demand by <b>' + diff + '</b>, so we add a <b>Dummy destination</b> (a column) with demand ' + diff + '. Shipping to Dummy means <i>not</i> shipping, so its costs are <b>0</b>.</p>';
         else html += '<p>Demand is bigger than supply by <b>' + diff.neg() + '</b>, so we add a <b>Dummy source</b> (a row) with supply ' + diff.neg() + '. Receiving from Dummy means <i>not</i> receiving, so its costs are <b>0</b>.</p>';
         push('Balance supply and demand', html, {
-            ...plain(diff.sign === 0 ? 'Supply ' + tS + ' = Demand ' + tD : 'Supply ' + tS + (diff.sign > 0 ? ' > ' : ' < ') + 'Demand ' + tD + '  →  Dummy ' + (diff.sign > 0 ? 'column' : 'row') + ' = ' + (diff.sign > 0 ? diff : diff.neg())),
+            ...(diff.sign === 0 ? fx('Supply ' + tS + ' = Demand ' + tD) : fx('Supply ' + tS + (diff.sign > 0 ? ' > ' : ' < ') + 'Demand ' + tD, 'Dummy ' + (diff.sign > 0 ? 'column' : 'row') + ' = ' + (diff.sign > 0 ? diff : diff.neg()))),
             table: snap({ newR: dummyRow, newC: dummyCol }), gallery: diff.sign === 0 ? 'Balanced table' : 'Balanced table (with Dummy)'
         });
     }
@@ -137,6 +144,8 @@ export function solveTransport(P: TransProblem): TransSolve {
     const sl = sup.slice(), dl = dem.slice();
     const done = { r: new Set<number>(), c: new Set<number>() };
     const method = P.method === 'lc' ? 'lc' : 'nwc';
+    const improve = P.improve === 'stepping' ? 'stepping' : 'modi';
+    const IM = improve === 'stepping' ? 'Stepping stone' : 'MODI';
     const startList: { r: number; c: number; amt: Fr }[] = [];
     let okStart = 0;
     const doAlloc = (i: number, j: number, why: string, extra: string) => {
@@ -153,9 +162,9 @@ export function solveTransport(P: TransProblem): TransSolve {
         html += '<p>Allocate <b>min(' + sb + ', ' + db + ') = ' + amt + '</b> to <b>' + cn(i, j) + '</b> (cost ' + cost[i][j] + ' per unit).</p>';
         html += '<p>' + rows[i] + ' has ' + sb + ' − ' + amt + ' = <b>' + sl[i] + '</b> left. ' + cols[j] + ' still needs ' + db + ' − ' + amt + ' = <b>' + dl[j] + '</b>.' +
             (rowGone && colGone ? ' <b>Both the row and the column are used up</b> (greyed out).' : rowGone ? ' Row <b>' + rows[i] + '</b> is used up (greyed out).' : colGone ? ' Column <b>' + cols[j] + '</b> is used up (greyed out).' : '') + '</p>' + extra;
-        const parts: FormulaPart[] = [{ t: 'min(' }, { t: S(sb), id: 's' }, { t: ', ' }, { t: S(db), id: 'd' }, { t: ') = ' }, { t: S(amt), id: 'r' }];
+        const parts: FormulaPart[] = [{ t: 'min(' }, { t: S(sb), id: 's' }, { t: ', ' }, { t: S(db), id: 'd' }, { t: ')' }];
         push('Allocation ' + okStart + ': ' + cn(i, j), html, {
-            fparts: parts, formula: parts.map(p => p.t).join(''),
+            ...fx(parts, [{ t: cn(i, j) + ' = ' }, { t: S(amt), id: 'r' }]),
             arrows: [{ from: [0, i, 's'], to: [0, i, j], kind: 'val', mid: true }, { from: [0, 'd', j], to: [0, i, j], kind: 'val' }],
             farrows: [{ part: 's', kind: 'val' }, { part: 'd', kind: 'val' }, { part: 'r', kind: 'res' }],
             table: snap({ alloc, left: { s: sl.map(S), d: dl.map(S), before: { i, j, s: S(sb), d: S(db) } }, grayR: Array.from(done.r), grayC: Array.from(done.c), flags: { [key(i, j)]: 'hl' } }),
@@ -169,7 +178,7 @@ export function solveTransport(P: TransProblem): TransSolve {
             method === 'nwc'
                 ? '<p><b>Northwest Corner method.</b> Start at the <b>top-left</b> cell. Allocate as much as you can: the smaller of the supply left and the demand left.</p><p>If the row is used up, move <b>down</b>. If the column is satisfied, move <b>right</b>. <i>Costs are ignored.</i> One allocation per step.</p>'
                 : '<p><b>Least Cost method.</b> Always take the cell with the <b>lowest cost</b> among rows and columns not yet used up. Allocate the smaller of the supply left and the demand left.</p><p><b>Dummy cells are filled last.</b> If two cells have the same cost, take the one that can hold the <b>larger amount</b>; if still tied, the first one in row order. One allocation per step.</p>',
-            { ...plain(method === 'nwc' ? 'Northwest Corner: top-left, then right or down' : 'Least Cost: cheapest real cell first, Dummy last'), table: snap({ left: { s: sl.map(S), d: dl.map(S) } }), group: 'Start 0' });
+            { ...fx(method === 'nwc' ? 'Northwest Corner: top-left, then right or down' : 'Least Cost: cheapest real cell first, Dummy last'), table: snap({ left: { s: sl.map(S), d: dl.map(S) } }), group: 'Start 0' });
     }
     if (method === 'nwc') {
         let i = 0, j = 0;
@@ -221,10 +230,10 @@ export function solveTransport(P: TransProblem): TransSolve {
         const showTable = (flags: Record<string, string> = {}) => snap({ alloc, flags });
         if (have === need) {
             push('Degeneracy test', '<p>A good basic solution has exactly <b>m + n − 1</b> filled cells: ' + m + ' + ' + n + ' − 1 = <b>' + need + '</b>.</p><p>We have <b>' + have + '</b> filled cells, so the solution is <b class="good">not degenerate</b> and we can go on.</p>',
-                { ...plain('filled cells = ' + have + '   m + n − 1 = ' + need + '   →   not degenerate'), table: showTable(), gallery: 'Starting solution' });
+                { ...fx('filled cells = ' + have + NL + 'm + n − 1 = ' + need, 'not degenerate'), table: showTable(), gallery: 'Starting solution' });
         } else {
             push('Degeneracy test', '<p>A good basic solution has exactly <b>m + n − 1</b> filled cells: ' + m + ' + ' + n + ' − 1 = <b>' + need + '</b>.</p><p>We have only <b>' + have + '</b>, so the solution is <b class="bad">degenerate</b>. MODI needs ' + need + ' filled cells to find every u and v, so we add ' + (need - have === 1 ? 'a' : (need - have)) + ' filled cell' + (need - have === 1 ? '' : 's') + ' with <b>0</b> units.</p>',
-                { ...plain('filled cells = ' + have + '   m + n − 1 = ' + need + '   →   degenerate'), table: showTable(), group: 'Degeneracy' });
+                { ...fx('filled cells = ' + have + NL + 'm + n − 1 = ' + need, 'degenerate'), table: showTable(), group: 'Degeneracy' });
             let guard = 0;
             while (have < need && guard++ < 20) {
                 /* union-find over rows and columns joined by the filled cells */
@@ -254,7 +263,7 @@ export function solveTransport(P: TransProblem): TransSolve {
                 push('Degeneracy: put a 0 in ' + cn(z.r, z.c),
                     '<p>Put a <b>0</b> in an empty cell that does <b>not</b> form a closed loop with the filled cells (a loop would make u and v impossible to solve one by one). Among those cells we take the cheapest real one: <b>' + cn(z.r, z.c) + '</b> (cost ' + cost[z.r][z.c] + ').</p>' +
                     '<p>If costs tie we take the cell that can hold the larger amount, then the first in row order. Dummy cells are used only if nothing else works.</p><p>Now there are <b>' + have + '</b> filled cells' + (have === need ? ' = m + n − 1. ✓' : ', still fewer than ' + need + '.') + '</p>',
-                    { ...plain(cn(z.r, z.c) + ' = 0   (filled cells: ' + have + ' of ' + need + ')'), table: showTable({ [key(z.r, z.c)]: 'new' }), arrows: [], gallery: have === need ? 'Starting solution' : undefined, group: 'Degeneracy' });
+                    { ...fx('filled cells: ' + have + ' of ' + need, cn(z.r, z.c) + ' = 0'), table: showTable({ [key(z.r, z.c)]: 'new' }), arrows: [], gallery: have === need ? 'Starting solution' : undefined, group: 'Degeneracy' });
             }
         }
     }
@@ -264,25 +273,70 @@ export function solveTransport(P: TransProblem): TransSolve {
     const startCost = TC;
     {
         const cells = basisOf(alloc);
-        const terms = cells.map(c => S(cost[c.r][c.c]) + '(' + S(alloc[c.r][c.c] as Fr) + ')');
+        const L = (f: (c: TCell) => string) => 'TC = ' + cells.map(f).join(' + ');
+        const lines = [
+            L(c => cn(c.r, c.c)),
+            L(c => S(cost[c.r][c.c]) + '(' + S(alloc[c.r][c.c] as Fr) + ')'),
+            L(c => S(cost[c.r][c.c].mul(alloc[c.r][c.c] as Fr)))
+        ];
         push('Total cost of the starting solution',
-            '<p>Multiply each filled cell\'s <b>cost per unit × units</b> and add them up:</p><p>' + cells.map(c => cn(c.r, c.c) + ': ' + cost[c.r][c.c] + ' × ' + alloc[c.r][c.c] + ' = ' + (cost[c.r][c.c].mul(alloc[c.r][c.c] as Fr))).join(' · ') + '</p>',
-            { ...plain('TC = ' + terms.join(' + ') + ' = ' + money(TC)), table: snap({ alloc, tc: TC }), group: 'Start cost' });
+            '<p>For every filled cell multiply <b>cost per unit × units</b>, then add them all up.</p>',
+            { ...fx(lines.join(NL), 'TC = ' + money(TC)), table: snap({ alloc, tc: TC }), group: 'Start cost' });
     }
 
-    /* ===== 5. MODI ===== */
+    /* ===== 5. MODI or Stepping stone ===== */
     const iterations: TransResult['iterations'] = [];
     let optimal = false, zeroIndexCells: string[] = [];
     for (let it = 1; it <= 40; it++) {
-        const tag = 'MODI ' + it;
+        const tag = IM + ' ' + it;
         const basis = basisOf(alloc);
+        /* the closed loop of an empty cell: the empty cell, then the filled cells that lead from its row to its column */
+        const loopTo = (e: TCell): TCell[] => {
+            const prev = new Map<number, { node: number; cell: TCell }>();
+            const seen = new Set<number>([e.r]);
+            const queue = [e.r];
+            while (queue.length && !prev.has(m + e.c)) {
+                const x = queue.shift() as number;
+                for (const c of basis) {
+                    const a = c.r, b = m + c.c;
+                    const [from, to] = x === a ? [a, b] : x === b ? [b, a] : [-1, -1];
+                    if (from < 0 || seen.has(to)) continue;
+                    seen.add(to); prev.set(to, { node: from, cell: c }); queue.push(to);
+                }
+            }
+            const path: TCell[] = [];
+            for (let node = m + e.c; node !== e.r;) { const p = prev.get(node) as { node: number; cell: TCell }; path.unshift(p.cell); node = p.node; }
+            return [e, ...path];
+        };
+        let uu: Fr[] | undefined, vv: Fr[] | undefined;
+        const index: (Fr | null)[][] = rows.map(() => cols.map(() => null));
+        const empties: TCell[] = [];
+        for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) if (!alloc[i][j]) empties.push({ r: i, c: j });
+
+        if (improve === 'stepping') {
+            /* -- stepping stone: the index of every empty cell from its own closed loop, one per step -- */
+            empties.forEach((e, k) => {
+                const lp = loopTo(e);
+                const d = lp.reduce((acc, c, q) => (q % 2 === 0 ? acc.add(cost[c.r][c.c]) : acc.sub(cost[c.r][c.c])), ZERO);
+                index[e.r][e.c] = d;
+                const sg: TTable['sign'] = {}; lp.forEach((c, q) => { sg[key(c.r, c.c)] = q % 2 === 0 ? '+' : '-'; });
+                const fl: Record<string, string> = {}; lp.forEach(c => { fl[key(c.r, c.c)] = 'loop'; }); fl[key(e.r, e.c)] = 'enter loop';
+                const terms = lp.map((c, q) => (q % 2 === 0 ? '+' : '−') + ' ' + cost[c.r][c.c]).join(' ').replace(/^\+ /, '');
+                const intro = k === 0
+                    ? '<p><b>Stepping Stone method.</b> For every <b>empty</b> cell, imagine sending <b>one unit</b> through it. To keep every row and column total the same, trace a <b>closed loop</b> that turns only at filled cells and mark it <b>+ − + − …</b>, starting with + on the empty cell.</p><p>Add the costs of the (+) cells and subtract the costs of the (−) cells. That is the <b>improvement index</b>: how the total cost changes for each unit. <b>Negative = cheaper.</b></p>'
+                    : '';
+                push(tag + ': stepping stone ' + cn(e.r, e.c),
+                    intro + '<p>Empty cell <b>' + cn(e.r, e.c) + '</b>. Loop: <b>' + lp.map((c, q) => cn(c.r, c.c) + ' (' + (q % 2 === 0 ? '+' : '−') + ')').join(', ') + '</b>.</p><p>Index = ' + lp.map((c, q) => (q % 2 === 0 ? '+' : '−') + cost[c.r][c.c]).join(' ') + ' = <b>' + d + '</b>' + (d.sign < 0 ? ' (negative: sending units here would lower the cost)' : d.sign === 0 ? ' (no change)' : '') + '.</p>',
+                    { ...fx(cn(e.r, e.c) + ' = ' + terms, cn(e.r, e.c) + ' = ' + S(d)), table: snap({ alloc, index: index.map(r => r.slice()), flags: fl, sign: sg, loop: lp }), group: tag + ' index' });
+            });
+        } else {
         /* -- u and v, one per step -- */
         const u: (Fr | null)[] = rows.map(() => null), v: (Fr | null)[] = cols.map(() => null);
         u[0] = ZERO;
         const showUV = () => ({ alloc, u: u.slice(), v: v.slice() });
         push(tag + ': ' + U(0) + ' = 0',
             '<p><b>MODI</b> (modified distribution) finds out if a cheaper schedule exists. Give every row a number <b>uᵢ</b> and every column a number <b>vⱼ</b> so that, for each <b>filled</b> cell, <b>uᵢ + vⱼ = cost</b>.</p><p>Start with <b>' + U(0) + ' = 0</b> (the first row, ' + rows[0] + '). Then solve the rest from the filled cells, one at a time.</p>',
-            { ...plain(U(0) + ' = 0'), table: snap(showUV()), group: tag + ' uv' });
+            { ...fx(U(0) + ' = 0'), table: snap(showUV()), group: tag + ' uv' });
         let changed = true, guard = 0;
         while (changed && guard++ < 100) {
             changed = false;
@@ -291,45 +345,46 @@ export function solveTransport(P: TransProblem): TransSolve {
                 if (ui && !vj) {
                     v[c.c] = cost[c.r][c.c].sub(ui);
                     const val = v[c.c] as Fr;
-                    const parts: FormulaPart[] = [{ t: V(c.c) + ' = ' }, { t: S(cost[c.r][c.c]), id: 'c' }, { t: ' − ' }, { t: S(ui).replace(/^-(.*)$/, '($&)'), id: 'k' }, { t: ' = ' }, { t: S(val), id: 'r' }];
+                    const parts: FormulaPart[] = [{ t: V(c.c) + ' = ' }, { t: S(cost[c.r][c.c]), id: 'c' }, { t: ' − ' }, { t: S(ui).replace(/^-(.*)$/, '($&)'), id: 'k' }];
+                    const ans: FormulaPart[] = [{ t: V(c.c) + ' = ' }, { t: S(val), id: 'r' }];
                     push(tag + ': ' + V(c.c) + ' = ' + S(val),
                         '<p>Filled cell <b>' + cn(c.r, c.c) + '</b> (cost ' + cost[c.r][c.c] + '): <b>' + U(c.r) + ' + ' + V(c.c) + ' = ' + cost[c.r][c.c] + '</b>. We know ' + U(c.r) + ' = ' + ui + ', so <b>' + V(c.c) + ' = ' + cost[c.r][c.c] + ' − ' + (ui.sign < 0 ? '(' + ui + ')' : ui) + ' = ' + val + '</b>.</p>',
-                        { fparts: parts, formula: parts.map(p => p.t).join(''), arrows: [{ from: [0, c.r, c.c], to: [0, 'v', c.c], kind: 'cost', mid: true }, { from: [0, c.r, 'u'], to: [0, 'v', c.c], kind: 'val' }], farrows: [{ part: 'c', kind: 'cost' }, { part: 'k', kind: 'val' }, { part: 'r', kind: 'res' }], table: snap({ ...showUV(), flags: { [key(c.r, c.c)]: 'hl' } }), group: tag + ' uv' });
+                        { ...fx(parts, ans), arrows: [{ from: [0, c.r, c.c], to: [0, 'v', c.c], kind: 'cost', mid: true }, { from: [0, c.r, 'u'], to: [0, 'v', c.c], kind: 'val' }], farrows: [{ part: 'c', kind: 'cost' }, { part: 'k', kind: 'val' }, { part: 'r', kind: 'res' }], table: snap({ ...showUV(), flags: { [key(c.r, c.c)]: 'hl' } }), group: tag + ' uv' });
                     changed = true;
                 } else if (vj && !ui) {
                     u[c.r] = cost[c.r][c.c].sub(vj);
                     const val = u[c.r] as Fr;
-                    const parts: FormulaPart[] = [{ t: U(c.r) + ' = ' }, { t: S(cost[c.r][c.c]), id: 'c' }, { t: ' − ' }, { t: S(vj).replace(/^-(.*)$/, '($&)'), id: 'k' }, { t: ' = ' }, { t: S(val), id: 'r' }];
+                    const parts: FormulaPart[] = [{ t: U(c.r) + ' = ' }, { t: S(cost[c.r][c.c]), id: 'c' }, { t: ' − ' }, { t: S(vj).replace(/^-(.*)$/, '($&)'), id: 'k' }];
+                    const ans: FormulaPart[] = [{ t: U(c.r) + ' = ' }, { t: S(val), id: 'r' }];
                     push(tag + ': ' + U(c.r) + ' = ' + S(val),
                         '<p>Filled cell <b>' + cn(c.r, c.c) + '</b> (cost ' + cost[c.r][c.c] + '): <b>' + U(c.r) + ' + ' + V(c.c) + ' = ' + cost[c.r][c.c] + '</b>. We know ' + V(c.c) + ' = ' + vj + ', so <b>' + U(c.r) + ' = ' + cost[c.r][c.c] + ' − ' + (vj.sign < 0 ? '(' + vj + ')' : vj) + ' = ' + val + '</b>.</p>',
-                        { fparts: parts, formula: parts.map(p => p.t).join(''), arrows: [{ from: [0, c.r, c.c], to: [0, c.r, 'u'], kind: 'cost', mid: true }, { from: [0, 'v', c.c], to: [0, c.r, 'u'], kind: 'val' }], farrows: [{ part: 'c', kind: 'cost' }, { part: 'k', kind: 'val' }, { part: 'r', kind: 'res' }], table: snap({ ...showUV(), flags: { [key(c.r, c.c)]: 'hl' } }), group: tag + ' uv' });
+                        { ...fx(parts, ans), arrows: [{ from: [0, c.r, c.c], to: [0, c.r, 'u'], kind: 'cost', mid: true }, { from: [0, 'v', c.c], to: [0, c.r, 'u'], kind: 'val' }], farrows: [{ part: 'c', kind: 'cost' }, { part: 'k', kind: 'val' }, { part: 'r', kind: 'res' }], table: snap({ ...showUV(), flags: { [key(c.r, c.c)]: 'hl' } }), group: tag + ' uv' });
                     changed = true;
                 }
             }
         }
         if (u.some(x => !x) || v.some(x => !x)) {
-            push('MODI: cannot solve', '<p class="bad">Some u or v could not be found, which means the filled cells do not connect every row and column. This should not happen after the degeneracy fix.</p>', { table: snap({ alloc }) });
+            push(IM + ': cannot solve', '<p class="bad">Some u or v could not be found, which means the filled cells do not connect every row and column. This should not happen after the degeneracy fix.</p>', { table: snap({ alloc }) });
             return { steps, error: undefined, result: undefined };
         }
-        const uu = u as Fr[], vv = v as Fr[];
+        uu = u as Fr[]; vv = v as Fr[];
 
         /* -- improvement index of every empty cell, one per step -- */
-        const index: (Fr | null)[][] = rows.map(() => cols.map(() => null));
-        const empties: TCell[] = [];
-        for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) if (!alloc[i][j]) empties.push({ r: i, c: j });
         empties.forEach((e, k) => {
-            const d = cost[e.r][e.c].sub(uu[e.r]).sub(vv[e.c]);
+            const d = cost[e.r][e.c].sub((uu as Fr[])[e.r]).sub((vv as Fr[])[e.c]);
             index[e.r][e.c] = d;
-            const parts: FormulaPart[] = [{ t: cn(e.r, e.c) + ': ' }, { t: S(cost[e.r][e.c]) }, { t: ' − ' }, { t: S(uu[e.r]).replace(/^-(.*)$/, '($&)'), id: 'u' }, { t: ' − ' }, { t: S(vv[e.c]).replace(/^-(.*)$/, '($&)'), id: 'v' }, { t: ' = ' }, { t: S(d), id: 'r' }];
+            const parts: FormulaPart[] = [{ t: cn(e.r, e.c) + ': ' }, { t: S(cost[e.r][e.c]) }, { t: ' − ' }, { t: S((uu as Fr[])[e.r]).replace(/^-(.*)$/, '($&)'), id: 'u' }, { t: ' − ' }, { t: S((vv as Fr[])[e.c]).replace(/^-(.*)$/, '($&)'), id: 'v' }];
+            const ans: FormulaPart[] = [{ t: cn(e.r, e.c) + ' = ' }, { t: S(d), id: 'r' }];
             push(tag + ': index of ' + cn(e.r, e.c),
                 '<p>The <b>improvement index</b> of an empty cell = <b>cost − uᵢ − vⱼ</b>. It tells how the total cost changes for each unit moved into this cell. <b>Negative = cheaper.</b></p>' + (k === 0 ? '<p>It is shown <b>circled</b> in the cell.</p>' : ''),
                 {
-                    fparts: parts, formula: parts.map(p => p.t).join(''),
+                    ...fx(parts, ans),
                     arrows: [{ from: [0, e.r, 'u'], to: [0, e.r, e.c], kind: 'val', mid: true }, { from: [0, 'v', e.c], to: [0, e.r, e.c], kind: 'val' }],
                     farrows: [{ part: 'u', kind: 'val' }, { part: 'v', kind: 'val' }, { part: 'r', kind: 'res' }],
                     table: snap({ alloc, u: uu, v: vv, index: index.map(r => r.slice()) }), group: tag + ' index'
                 });
         });
+        }
         zeroIndexCells = empties.filter(e => (index[e.r][e.c] as Fr).sign === 0).map(e => cn(e.r, e.c));
 
         /* -- optimal? -- */
@@ -340,7 +395,7 @@ export function solveTransport(P: TransProblem): TransSolve {
             push(tag + ': optimal',
                 '<p class="good"><b>No improvement index is negative, so this schedule is optimal.</b></p><p>Total cost = <b>' + money(TC) + '</b>.</p>' +
                 (zeroIndexCells.length ? '<p>The index of <b>' + zeroIndexCells.join(', ') + '</b> is exactly <b>0</b>, so moving units there would not change the cost: other schedules cost the same.</p>' : ''),
-                { ...plain('all indexes ≥ 0  →  optimal,  TC = ' + money(TC)), table: snap({ alloc, u: uu, v: vv, index }), gallery: it === 1 ? 'Optimal (MODI)' : 'Optimal table', group: tag + ' optimal' });
+                { ...fx('all indexes ≥ 0', 'optimal,  TC = ' + money(TC)), table: snap({ alloc, u: uu, v: vv, index }), gallery: it === 1 ? 'Optimal (' + IM + ')' : 'Optimal table', group: tag + ' optimal' });
             break;
         }
         const e = enter as TCell;
@@ -348,31 +403,16 @@ export function solveTransport(P: TransProblem): TransSolve {
         const negs = empties.filter(x => (index[x.r][x.c] as Fr).cmp(ei) === 0);
         push(tag + ': entering cell ' + cn(e.r, e.c),
             '<p>Not optimal yet: some indexes are negative. Pick the <b>most negative</b> one: <b>' + cn(e.r, e.c) + '</b> with index <b>' + ei + '</b>.</p>' + (negs.length > 1 ? '<p>' + negs.map(x => cn(x.r, x.c)).join(' and ') + ' tie, so we take the first in row order.</p>' : '') + '<p>Every unit moved into this cell lowers the cost by ' + ei.neg() + '.</p>',
-            { ...plain('most negative index: ' + cn(e.r, e.c) + ' = ' + ei), table: snap({ alloc, u: uu, v: vv, index, flags: { [key(e.r, e.c)]: 'enter' } }), group: tag + ' enter' });
+            { ...fx('most negative index = ' + ei, 'enter ' + cn(e.r, e.c)), table: snap({ alloc, u: uu, v: vv, index, flags: { [key(e.r, e.c)]: 'enter' } }), group: tag + ' enter' });
 
-        /* -- closed loop: the path from row e.r to column e.c through the filled cells -- */
-        const prev = new Map<number, { node: number; cell: TCell }>();
-        const seen = new Set<number>([e.r]);
-        const queue = [e.r];
-        while (queue.length && !prev.has(m + e.c)) {
-            const x = queue.shift() as number;
-            for (const c of basis) {
-                const a = c.r, b = m + c.c;
-                const [from, to] = x === a ? [a, b] : x === b ? [b, a] : [-1, -1];
-                if (from < 0 || seen.has(to)) continue;
-                seen.add(to); prev.set(to, { node: from, cell: c }); queue.push(to);
-            }
-        }
-        const path: TCell[] = [];
-        for (let node = m + e.c; node !== e.r;) { const p = prev.get(node) as { node: number; cell: TCell }; path.unshift(p.cell); node = p.node; }
-        const loop: TCell[] = [e, ...path];
+        const loop: TCell[] = loopTo(e);
         const sign: TTable['sign'] = {};
         loop.forEach((c, k) => { sign[key(c.r, c.c)] = k % 2 === 0 ? '+' : '-'; });
         const minus = loop.filter((_, k) => k % 2 === 1), plus = loop.filter((_, k) => k % 2 === 0);
         const flagsLoop: Record<string, string> = {}; loop.forEach(c => { flagsLoop[key(c.r, c.c)] = 'loop'; }); flagsLoop[key(e.r, e.c)] = 'enter loop';
-        push(tag + ': closed loop',
+        if (improve === 'modi') push(tag + ': closed loop',
             '<p>Draw a <b>closed loop</b> that starts at <b>' + cn(e.r, e.c) + '</b> and turns only at filled cells, moving along rows and columns.</p><p>Mark the cells <b>+ − + −</b> in turn, starting with + on ' + cn(e.r, e.c) + ': <b>' + loop.map((c, k) => cn(c.r, c.c) + ' (' + (k % 2 === 0 ? '+' : '−') + ')').join(', ') + '</b>.</p>',
-            { ...plain('loop: ' + loop.map((c, k) => (k % 2 === 0 ? '+' : '−') + cn(c.r, c.c)).join('  ')), table: snap({ alloc, u: uu, v: vv, index, flags: flagsLoop, sign, loop }), group: tag + ' loop' });
+            { ...fx(loop.map((c, k) => (k % 2 === 0 ? '+' : '−') + cn(c.r, c.c)).join('  ')), table: snap({ alloc, u: uu, v: vv, index, flags: flagsLoop, sign, loop }), group: tag + ' loop' });
 
         /* -- theta: the smallest (−) cell -- */
         const mins = minus.map(c => alloc[c.r][c.c] as Fr);
@@ -386,7 +426,7 @@ export function solveTransport(P: TransProblem): TransSolve {
         else if (ties.length > 1) thetaHtml += '<p>' + ties.map(c => cn(c.r, c.c)).join(' and ') + ' both reach 0 together. Only <b>one</b> leaves (' + cn(leave.r, leave.c) + ', the one with the higher cost); the other <b>stays as a filled 0</b>, so we keep exactly ' + need + ' filled cells.</p>';
         push(tag + ': θ = ' + theta,
             thetaHtml,
-            { ...plain('θ = min(' + minus.map(c => S(alloc[c.r][c.c] as Fr)).join(', ') + ') = ' + theta), table: snap({ alloc, u: uu, v: vv, index, flags: flagsTheta, sign, loop }), group: tag + ' theta' });
+            { ...fx('θ = min(' + minus.map(c => S(alloc[c.r][c.c] as Fr)).join(', ') + ')', 'θ = ' + theta), table: snap({ alloc, u: uu, v: vv, index, flags: flagsTheta, sign, loop }), group: tag + ' theta' });
 
         /* -- shift θ around the loop -- */
         const old = alloc.map(r => r.slice());
@@ -396,20 +436,21 @@ export function solveTransport(P: TransProblem): TransSolve {
         const flagsNew: Record<string, string> = { [key(e.r, e.c)]: 'new' };
         push(tag + ': move ' + theta + ' units',
             '<p>Add θ = <b>' + theta + '</b> to the (+) cells and subtract it from the (−) cells:</p><ul>' + plus.map(c => '<li>' + cn(c.r, c.c) + ' (+): ' + S(old[c.r][c.c] || ZERO) + ' + ' + theta + ' = <b>' + S(alloc[c.r][c.c] as Fr) + '</b></li>').join('') + minus.map(c => '<li>' + cn(c.r, c.c) + ' (−): ' + S(old[c.r][c.c] as Fr) + ' − ' + theta + ' = <b>' + (c === leave ? '0 (leaves)' : S(alloc[c.r][c.c] as Fr)) + '</b></li>').join('') + '</ul>',
-            { ...plain('+' + theta + ' on ' + plus.map(c => cn(c.r, c.c)).join(', ') + '   −' + theta + ' on ' + minus.map(c => cn(c.r, c.c)).join(', ')), table: snap({ alloc, flags: flagsNew }), group: tag + ' move' });
+            { ...fx('+' + theta + ' on ' + plus.map(c => cn(c.r, c.c)).join(', ') + NL + '−' + theta + ' on ' + minus.map(c => cn(c.r, c.c)).join(', ')), table: snap({ alloc, flags: flagsNew }), group: tag + ' move' });
 
         /* -- new cost = old cost + index × θ -- */
         const newTC = TC.add(ei.mul(theta));
         const calc = tcOf(alloc);
         const same = theta.sign === 0;
-        const parts: FormulaPart[] = [{ t: 'New TC = ' + money(TC) + ' + (' }, { t: S(ei), id: 'i' }, { t: ') × ' }, { t: S(theta), id: 't' }, { t: ' = ' }, { t: money(newTC), id: 'r' }];
+        const parts: FormulaPart[] = [{ t: 'New TC = ' + money(TC) + ' + (' }, { t: S(ei), id: 'i' }, { t: ') × ' }, { t: S(theta), id: 't' }];
+        const ans: FormulaPart[] = [{ t: 'New TC = ' }, { t: money(newTC), id: 'r' }];
         push(tag + ': new total cost',
             '<p><b>New cost = old cost + (index × amount moved)</b>.</p>' + (same ? '<p>Because θ = 0 the cost does not change: ' + money(TC) + '.</p>' : '<p>' + money(TC) + ' + (' + ei + ' × ' + theta + ') = <b>' + money(newTC) + '</b>.</p>') +
             (calc.cmp(newTC) === 0 ? '<p class="good">Check: adding up cost × units of the new schedule also gives ' + money(calc) + '. ✓</p>' : ''),
-            { fparts: parts, formula: parts.map(p => p.t).join(''), farrows: [{ part: 'i', kind: 'val' }, { part: 't', kind: 'mult' }, { part: 'r', kind: 'res' }], table: snap({ alloc, tc: newTC, flags: flagsNew }), gallery: 'After MODI iteration ' + it, group: tag + ' cost' });
+            { ...fx(parts, ans), farrows: [{ part: 'i', kind: 'val' }, { part: 't', kind: 'mult' }, { part: 'r', kind: 'res' }], table: snap({ alloc, tc: newTC, flags: flagsNew }), gallery: 'After ' + IM + ' iteration ' + it, group: tag + ' cost' });
         iterations.push({ enter: cn(e.r, e.c), index: S(ei), theta: S(theta), leave: cn(leave.r, leave.c), cost: S(calc), zeroMove: same });
         TC = calc;
-        if (it === 40) push('MODI stopped', '<p class="bad">Stopped after 40 iterations (the problem may be cycling).</p>', { table: snap({ alloc }) });
+        if (it === 40) push(IM + ' stopped', '<p class="bad">Stopped after 40 iterations (the problem may be cycling).</p>', { table: snap({ alloc }) });
     }
 
     /* ===== 6. Answer ===== */

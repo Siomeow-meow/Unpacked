@@ -62,6 +62,8 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .ttbl table { table-layout: fixed; }
 .ttbl th { font-weight: 700; overflow: hidden; white-space: nowrap; }
 .ttbl th.rowh { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.ttbl th.dm { font-style: italic; }
+.ttbl td.newcell, .ttbl th.newd { background: color-mix(in srgb, var(--pivot) 28%, var(--card)); }
 .ttbl th.corner { background: transparent; border-color: transparent; }
 .ttbl td.tc { position: relative; padding: 0; }
 .ttbl .cbox { position: absolute; top: 2px; right: 2px; font-size: var(--cfs, 9px); line-height: 1.2; padding: 0 3px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--bg); font-weight: 600; }
@@ -75,8 +77,6 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .ttbl td.hl { box-shadow: inset 0 0 0 2px var(--accent); }
 .ttbl td.loop { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
 .ttbl .gr { opacity: .4; background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--muted) 35%, transparent) 5px 6px); }
-.ttbl th.dm { font-style: italic; }
-.ttbl td.newcell, .ttbl th.newd { background: color-mix(in srgb, var(--pivot) 28%, var(--card)); }
 .ttbl .to { font-style: normal; color: var(--muted); padding: 0 .2em; }
 .ttbl td.uvc { background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
 .ttbl td.tcell { font-weight: 800; }
@@ -101,7 +101,7 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .stepCard.flow { --fz: 1; }
 .stepCard.flow .stext { overflow: visible; font-size: calc(.94rem * var(--fz)); }
 .stepCard.flow .formula { height: auto; min-height: 38px; padding: 6px 12px; overflow: visible; font-size: calc(clamp(.82rem, .5vw + .62rem, 1.05rem) * var(--fz)); }
-.stepCard.flow .formula.wrap { white-space: normal; display: block; line-height: 1.5; word-break: break-word; }
+.stepCard.flow .formula.wrap { white-space: pre-line; display: block; line-height: 1.5; word-break: break-word; }
 .stepCard.flow .legend:empty { display: none; }
 .stepCard.flow > * { min-height: auto; }   /* text rows take the height they need, so overflow can be measured and fixed */
 .stepCard.flow > .viz { min-height: 0; }
@@ -177,9 +177,6 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .pickText h2 { font-size: clamp(1.4rem, 1.6vw + .9rem, 1.9rem); line-height: 1.1; }
 .pickText p { margin: 0; }
 .chipres { justify-self: start; margin-top: 6px; padding: 6px 12px; border-radius: 10px; border: 1.5px solid var(--good); color: var(--good); font: 700 .9rem ui-monospace, Consolas, monospace; background: color-mix(in srgb, var(--good) 10%, var(--card)); }
-.dashes { display: flex; gap: 3px; margin-top: 8px; }
-.dashes i { flex: 1; max-width: 14px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
-.dashes i.on { background: var(--accent); }
 .pickBtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .preview { position: relative; min-height: 190px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; display: grid; }
 .preview .pv { position: absolute; inset: 0 0 22px 0; padding: 8px; }
@@ -209,7 +206,7 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .lcardH { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) 76px; gap: 4px 10px; align-items: start; padding: 12px; text-decoration: none; color: inherit; height: 100%; }
 .lcardH:hover { border-color: var(--accent); }
 .lcardH.next { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-.lcardH .num { grid-row: 1; width: 22px; height: 22px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: .78rem; }
+.lcardH .num { grid-row: 1; width: 22px; height: 22px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: .62rem; }
 .lcardH .lt { grid-column: 2; display: grid; gap: 3px; align-content: start; min-width: 0; }
 .lcardH .lt p { margin: 0; color: var(--muted); font-size: .84rem; }
 .lcardH .thumb { grid-column: 3; grid-row: 1 / span 2; width: 76px; border-radius: 8px; background: var(--bg); }
@@ -241,3 +238,36 @@ details.tp summary { cursor: pointer; padding: 4px 0; }
 .pickBtns .btn { padding: 8px 14px; font-size: .9rem; }
 @media (max-width: 640px) { .pick { grid-template-columns: minmax(0, 1fr); } }
 .lcardH.soon { opacity: .75; cursor: default; }
+
+/* Transportation: pick a path, start then improve */
+.mpath { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: stretch; margin: 2px 0 10px; }
+.mstep { min-width: 0; }
+.mhead { display: flex; align-items: center; gap: 8px; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.mhead em { font-style: normal; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: .62rem; letter-spacing: 0; }
+.mtiles { display: grid; gap: 4px; }
+.mtile { cursor: pointer; display: block; }
+.mtile input { position: absolute; opacity: 0; }
+.mtile > span { display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 5px 8px; border: 1px solid var(--line); border-radius: 9px; transition: border-color .15s, background .15s; }
+.mtile i { grid-row: 1 / 3; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-style: normal; font-weight: 800; font-size: .62rem; }
+.mtile b { font-size: .8rem; line-height: 1.15; }
+.mtile small { color: var(--muted); font-size: .68rem; line-height: 1.2; }
+.mtile:hover > span { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.mtile input:checked + span { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.mtile input:checked + span i { background: var(--accent); color: var(--accent-ink); }
+.mtile input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.marrow { align-self: center; color: var(--muted); font-size: 1rem; padding-top: 16px; }
+@media (max-width: 640px) { .mpath { grid-template-columns: 1fr; } .marrow { display: none; } }
+
+/* labelled formula boxes: Formula, then Final Answer */
+.stepCard.flow .formula.multi { display: grid; gap: 6px; padding: 0; background: none; border: 0; min-height: 0; white-space: normal; }
+.formula.multi .fbox { padding: 6px 12px 7px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.formula.multi .fbox.ans { background: color-mix(in srgb, var(--accent) 18%, var(--card)); border-color: var(--accent); }
+.formula.multi .flabel { font: 700 .66rem system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.formula.multi .fbox.ans .flabel { color: var(--accent); }
+.formula.multi .fln { line-height: 1.5; word-break: break-word; }
+
+/* the loop draws itself, and each cell's numbers appear when the line reaches it */
+.lmask { stroke-dasharray: 1; stroke-dashoffset: 0; animation: loopDraw var(--ld) linear var(--ls) both; }
+@keyframes loopDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.lcell > :not(.cbox) { animation: loopShow .3s ease-out var(--ld) both; }
+@keyframes loopShow { from { opacity: 0; } to { opacity: 1; } }

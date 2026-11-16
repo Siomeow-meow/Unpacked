@@ -5,7 +5,7 @@ import { parseFr } from '../../lib/simplex/solver';
 import { LINE_COLORS, MAX_CONS, solveGraphical, type GraphPoint, type GraphProblem, type GraphStep } from '../../lib/graphical/solver';
 import { clamp, clone } from '../../lib/util';
 import { Select } from '../../components/Select';
-import { ExamplesList, SavedProblems } from '../../components/SavedProblems';
+import { SavedProblems } from '../../components/SavedProblems';
 import { LessonShell } from '../../components/LessonShell';
 import { StepCard } from '../../components/StepCard';
 import { useLesson, type LessonConfig } from '../../components/useLesson';
@@ -237,15 +237,10 @@ export default function GraphicalLesson() {
             </section>
 
             <section className="card" id="saves">
-                <ExamplesList
-                    items={[
+                <SavedProblems<GraphProblem> examples={[
                         { key: 'max', name: 'Max: Default', meta: 'Max' },
-                        { key: 'min', name: 'Min: Default', meta: 'Min' },
-                        { key: 'empty', name: 'No feasible region', meta: 'Max' },
-                        { key: 'unbounded', name: 'Unbounded region', meta: 'Max' }
-                    ]}
-                    onLoad={k => L.loadProblem(GRAPH_EXAMPLES[k as GraphExampleKey])} />
-                <SavedProblems<GraphProblem> lesson="graphical" problem={P} isValid={validProblem} fileName="graphical-problems.json"
+                        { key: 'min', name: 'Min: Default', meta: 'Min' }
+                    ]} onExample={k => L.loadProblem(GRAPH_EXAMPLES[k as GraphExampleKey])} lesson="graphical" problem={P} isValid={validProblem} fileName="graphical-problems.json"
                     meta={p => (p.mode === 'max' ? 'Max' : 'Min')} onLoad={q => L.loadProblem(CONFIG.normalize!(q))} onError={L.setErr} />
             </section>
         </div>

@@ -9,7 +9,41 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
     {
-        version: 'v2.0', title: 'Version 2.0', tag: { text: 'Latest' },
+        version: 'v2.1', title: 'Version 2.1', tag: { text: 'Latest' },
+        blurb: 'Files, typing, Stepping Stone and more animation.',
+        sections: [
+            { h: 'New', items: [
+                '<b>Files.</b> The Code visualizer and the C lessons have file tabs. Press + to add a file, double-click a tab to rename it, and use the x to close it.',
+                '<b>#include your own files.</b> A file runs when main.c has <code>#include "file2.c"</code>. Stepping into another file opens its tab.',
+                '<b>Type in the Output.</b> When a program reaches scanf or getchar, type right after the printed text and press Enter, like a terminal. Ctrl+D ends the input.',
+                '<b>Text as characters.</b> A char array shows one box per character, ending with \0, and a char * shows the characters it points to.',
+                '<b>Stepping Stone method.</b> The Transportation Problem can now be improved with MODI or with Stepping Stone. Choose one in Improve with. Stepping Stone tries each empty cell with its own closed loop and shows the + and − cells.',
+                '<b>Saved problems.</b> Every Quantitative Methods lesson has one Saved problems list: the default problems first, then yours. Save, load, delete, export and import.',
+                '<b>More of C.</b> switch, static variables, macros with arguments, fgets from the keyboard, and the ctype, math and string functions (toupper, isdigit, floor, strstr, sprintf and more).',
+                '<b>Circular array queue.</b> Stack & Queue has a second circular queue example that keeps one slot empty, so full and empty are told apart without a counter. Watch rear wrap around to the start of the array. It comes with a practice.',
+                '<b>Lighter comments.</b> Comments in the code boxes are drawn in a lighter gray.'
+            ] },
+            { h: 'Improved', items: [
+                '<b>Transportation Problem.</b> The default problem is the one from class (supply equals demand, so there is no Dummy). The third example is now an unbalanced problem, which gets a Dummy column.',
+                '<b>Transportation steps.</b> The Start with and Improve with choices are now small cards. Formulas show in boxes: Formula, and Final Answer when a step has one. In Stepping Stone and the MODI closed loop, the dotted line draws itself from cell to cell and the numbers of each cell appear as the line reaches it.',
+                '<b>Home page.</b> Pick up where you left off now plays the animation of the lesson (arrows, and the Transportation loop), and the Code visualizer types its example code out by itself. Click the box to stop the typing.',
+                '<b>Problem tab.</b> The problem and the Saved problems list fill the tab (60 / 40), and the list scrolls instead of growing.',
+                '<b>Graphical Method.</b> The examples are Max: Default and Min: Default.',
+                '<b>Quantitative Methods lessons.</b> The lesson cards sit in a grid of five, the same as C Programming, and the dashed progress bar is gone.',
+                '<b>Steps.</b> A char shows as the character itself (\'b\'), and a scanf step says how many values it read.',
+                '<b>Cleaner header.</b> The Code visualizer header no longer repeats the compile status. It is in the Output and Compiler panels.',
+                '<b>Dark title bar.</b> The installed app uses a dark title bar and a new icon.'
+            ] },
+            { h: 'Bug Fixes', items: [
+                '<b>Wrong answers.</b> A static variable kept its value, 010 is 8, 1LL << 40 is right, and %e prints e+03.',
+                '<b>False warning.</b> Copying a struct no longer says it reads a value that was never set.',
+                '<b>Pointer to a char array.</b> Arrows now point at the exact character.',
+                '<b>Code boxes.</b> Buttons next to the file tabs no longer touch the bottom edge.'
+            ] }
+        ]
+    },
+    {
+        version: 'v2.0', title: 'Version 2.0',
         blurb: 'Simplex step by step is now Unpacked: a place to learn problem solving one step at a time.',
         sections: [
             { h: 'New', items: [

@@ -42,7 +42,7 @@ export function typeName(t: CType): string {
 export interface Tok { t: 'id' | 'num' | 'fnum' | 'chr' | 'str' | 'p' | 'eof'; v: string; n: number; pos: number; end: number; line: number; col: number }
 const PUNCT = ['<<=', '>>=', '...', '->', '++', '--', '<<', '>>', '<=', '>=', '==', '!=', '&&', '||', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=',
     '+', '-', '*', '/', '%', '&', '|', '^', '~', '!', '<', '>', '=', '?', ':', ';', ',', '.', '(', ')', '[', ']', '{', '}'];
-const BUILTIN_MACROS: Record<string, string> = { true: '1', false: '0', NULL: '0', INT_MAX: '2147483647', INT_MIN: '(-2147483647-1)', EOF: '(-1)', RAND_MAX: '2147483647', UINT_MAX: '4294967295', CHAR_BIT: '8', stdout: '20736', stderr: '20752' };
+const BUILTIN_MACROS: Record<string, string> = { true: '1', false: '0', NULL: '0', INT_MAX: '2147483647', INT_MIN: '(-2147483647-1)', EOF: '(-1)', RAND_MAX: '2147483647', UINT_MAX: '4294967295', CHAR_BIT: '8', stdout: '20736', stderr: '20752', stdin: '20720' };
 
 function escChar(src: string, i: number): [number, number] {
     // src[i] is the char after the backslash; returns [code, next index]
@@ -53,9 +53,11 @@ function escChar(src: string, i: number): [number, number] {
     return [c.charCodeAt(0), i + 1];
 }
 
-export function lex(src: string): Tok[] {
+interface MacroCtx { macros: Map<string, Tok[]>; fmacros: Map<string, { params: string[]; body: string }>; depth: number }
+export function lex(src: string, shared?: MacroCtx): Tok[] {
     const toks: Tok[] = [];
-    const macros = new Map<string, Tok[]>();
+    const ctx: MacroCtx = shared ?? { macros: new Map(), fmacros: new Map(), depth: 0 };
+    const macros = ctx.macros, fmacros = ctx.fmacros;
     let i = 0, line = 1, lineStart = 0, atLineStart = true;
     const err = (m: string) => new CompileError(m, line, i - lineStart + 1);
     const push = (t: Tok['t'], v: string, n: number, pos: number, end: number, ln: number, col: number) => {
@@ -78,12 +80,44 @@ export function lex(src: string): Tok[] {
             while (j < src.length && src[j] !== '\n') { if (src[j] === '\\' && src[j + 1] === '\n') { j += 2; line++; continue; } j++; }
             const text = src.slice(i + 1, j);
             const m = /^\s*define\s+([A-Za-z_]\w*)(\(?)(.*)$/s.exec(text);
-            if (m && !m[2]) macros.set(m[1], lex(m[3]).slice(0, -1));
+            if (m && !m[2]) macros.set(m[1], lex(m[3], ctx).slice(0, -1));
+            else if (m) {      // #define NAME(a, b) body
+                const fm = /^\s*([^)]*)\)(.*)$/s.exec(m[3]);
+                if (fm) fmacros.set(m[1], { params: fm[1].split(',').map(x => x.trim()).filter(Boolean), body: fm[2].trim() });
+            }
             i = j; continue;
         }
         atLineStart = false;
         const col = i - lineStart + 1, start = i;
-        if (/[A-Za-z_]/.test(c)) { let j = i; while (j < src.length && /\w/.test(src[j])) j++; push('id', src.slice(i, j), 0, start, j, line, col); i = j; continue; }
+        if (/[A-Za-z_]/.test(c)) {
+            let j = i; while (j < src.length && /\w/.test(src[j])) j++;
+            const name = src.slice(i, j), fm = fmacros.get(name);
+            if (fm) {      // a macro with arguments: its text is put in place, with the arguments written in where the names are
+                let k = j; while (k < src.length && /[ \t\r\n]/.test(src[k])) k++;
+                if (src[k] === '(') {
+                    const args: string[] = []; let depth = 0, cur = '', q = '', n = k;
+                    const ln0 = line;
+                    for (; n < src.length; n++) {
+                        const ch = src[n];
+                        if (ch === '\n') { line++; lineStart = n + 1; }
+                        if (q) { cur += ch; if (ch === '\\') cur += src[++n] ?? ''; else if (ch === q) q = ''; continue; }
+                        if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+                        if (ch === '(') { if (depth++ > 0) cur += ch; continue; }
+                        if (ch === ')') { if (--depth === 0) break; cur += ch; continue; }
+                        if (ch === ',' && depth === 1) { args.push(cur.trim()); cur = ''; continue; }
+                        cur += ch;
+                    }
+                    if (depth !== 0) throw err('The macro "' + name + '" is missing its closing )');
+                    if (cur.trim() || args.length) args.push(cur.trim());
+                    if (++ctx.depth > 40) throw err('The macro "' + name + '" uses itself');
+                    const text = fm.body.replace(/[A-Za-z_]\w*/g, w => { const ix = fm.params.indexOf(w); return ix >= 0 ? (args[ix] ?? '') : w; });
+                    const sub = lex(text, ctx); ctx.depth--;
+                    sub.slice(0, -1).forEach(b => toks.push({ ...b, pos: start, end: n + 1, line: ln0, col }));
+                    i = n + 1; continue;
+                }
+            }
+            push('id', name, 0, start, j, line, col); i = j; continue;
+        }
         if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
             let j = i;
             if (c === '0' && /[xX]/.test(src[i + 1] || '')) { j = i + 2; while (/[0-9a-fA-F]/.test(src[j] || '')) j++; const v = parseInt(src.slice(i, j), 16); while (/[uUlL]/.test(src[j] || '')) j++; push('num', src.slice(i, j), v, start, j, line, col); i = j; continue; }
@@ -91,7 +125,8 @@ export function lex(src: string): Tok[] {
             let isF = false;
             if (src[j] === '.') { isF = true; j++; while (/[0-9]/.test(src[j] || '')) j++; }
             if (/[eE]/.test(src[j] || '') && /[-+0-9]/.test(src[j + 1] || '')) { isF = true; j += 2; while (/[0-9]/.test(src[j] || '')) j++; }
-            const num = parseFloat(src.slice(i, j));
+            const lit = src.slice(i, j);
+            const num = !isF && lit.length > 1 && lit[0] === '0' && /^[0-7]+$/.test(lit) ? parseInt(lit, 8) : parseFloat(lit);
             while (/[uUlLfF]/.test(src[j] || '')) { if (/[fF]/.test(src[j])) isF = true; j++; }
             push(isF ? 'fnum' : 'num', src.slice(i, j), num, start, j, line, col); i = j; continue;
         }
@@ -169,13 +204,15 @@ export function parse(src: string): Program {
     };
 
     /* ---- declaration specifiers ---- */
-    const specifiers = (): CType => {
+    let lastStatic = false;       // did the specifiers just read include "static"?
+    const specifiers = (): CType => { let st = false; const r = specifiers1(() => { st = true; }); lastStatic = st; return r; };
+    const specifiers1 = (onStatic: () => void): CType => {
         let unsigned = false, signed = false, long = 0, short = false, base: CType | null = null, sawAny = false;
         for (;;) {
             const t = peek();
             if (t.t !== 'id') break;
             const w = t.v;
-            if (w === 'const' || w === 'volatile' || w === 'static' || w === 'extern' || w === 'register' || w === 'inline') { i++; sawAny = true; continue; }
+            if (w === 'const' || w === 'volatile' || w === 'static' || w === 'extern' || w === 'register' || w === 'inline') { if (w === 'static') onStatic(); i++; sawAny = true; continue; }
             if (w === 'unsigned') { unsigned = true; i++; sawAny = true; continue; }
             if (w === 'signed') { signed = true; i++; sawAny = true; continue; }
             if (w === 'long') { long++; i++; sawAny = true; continue; }
@@ -319,7 +356,7 @@ export function parse(src: string): Program {
     }
     function primary(): E {
         const a = peek();
-        if (a.t === 'num') { i++; return node('num', a, { v: a.n, big: a.n > 2147483647 }); }
+        if (a.t === 'num') { i++; return node('num', a, { v: a.n, big: a.n > 2147483647 || /[lL]/.test(a.v) }); }
         if (a.t === 'fnum') { i++; return node('fnum', a, { v: a.n, single: /[fF]$/.test(a.v) }); }
         if (a.t === 'chr') { i++; return node('chr', a, { v: a.n }); }
         if (a.t === 'str') { i++; return node('str', a, { v: a.v }); }
@@ -342,6 +379,7 @@ export function parse(src: string): Program {
         return assign();
     }
     function declaration(base: CType, first: Tok): S {
+        const isStatic = lastStatic;
         const decls: { name: string; type: CType; init: E | null; pos: number; end: number }[] = [];
         do {
             const st = peek();
@@ -355,7 +393,7 @@ export function parse(src: string): Program {
             decls.push({ name: d.name, type, init, pos: st.pos, end: toks[i - 1].end });
         } while (accept(','));
         expect(';');
-        return { k: 'decl', decls, pos: first.pos, end: toks[i - 1].end, line: first.line };
+        return { k: 'decl', decls, static: isStatic, pos: first.pos, end: toks[i - 1].end, line: first.line };
     }
     function statement(): S {
         const a = peek();
@@ -384,7 +422,20 @@ export function parse(src: string): Program {
                 case 'return': { i++; const e = isP(';') ? null : expr(); expect(';'); return { k: 'return', e, pos: a.pos, end: toks[i - 1].end, line: a.line }; }
                 case 'break': { i++; expect(';'); return { k: 'break', pos: a.pos, end: toks[i - 1].end, line: a.line }; }
                 case 'continue': { i++; expect(';'); return { k: 'continue', pos: a.pos, end: toks[i - 1].end, line: a.line }; }
-                case 'switch': throw err('"switch" is not supported yet');
+                case 'switch': {
+                    i++; expect('('); const c = expr(); expect(')');
+                    if (!isP('{')) throw err('Expected "{" after switch (...)');
+                    i++;
+                    const items: S[] = [], cases: { value: E | null; at: number }[] = [];
+                    while (!isP('}')) {
+                        if (peek().t === 'eof') throw err('Missing "}" for the switch that starts on line ' + a.line, a);
+                        if (isId('case')) { i++; const value = assign(); expect(':'); cases.push({ value, at: items.length }); continue; }
+                        if (isId('default')) { i++; expect(':'); cases.push({ value: null, at: items.length }); continue; }
+                        items.push(statement());
+                    }
+                    const z = toks[i++];
+                    return { k: 'switch', c, items, cases, pos: a.pos, end: z.end, line: a.line, endLine: z.line };
+                }
                 case 'goto': throw err('"goto" is not supported');
             }
             if (isTypeStart()) { const b = specifiers(); return declaration(b, a); }

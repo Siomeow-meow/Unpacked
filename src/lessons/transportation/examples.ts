@@ -1,24 +1,20 @@
 import type { TransProblem } from '../../lib/transportation/solver';
 
-export type TransExampleKey = 'nwc' | 'lc' | 'balanced' | 'dummyrow';
+export type TransExampleKey = 'nwc' | 'lc' | 'unbalanced';
 
-const SOURCES = [{ name: 'A', supply: '100' }, { name: 'B', supply: '60' }, { name: 'C', supply: '120' }];
-const DESTS = [{ name: 'W', demand: '70' }, { name: 'X', demand: '50' }, { name: 'Y', demand: '60' }, { name: 'Z', demand: '60' }];
-const COST = [['1', '5', '3', '4'], ['4', '2', '2', '4'], ['3', '1', '2', '4']];
+/* The problem from class (balanced: supply 700 = demand 700). Costs: D 5 4 3, E 8 4 3, F 9 7 5. */
+const SOURCES = [{ name: 'D', supply: '100' }, { name: 'E', supply: '300' }, { name: 'F', supply: '300' }];
+const DESTS = [{ name: 'A', demand: '300' }, { name: 'B', demand: '200' }, { name: 'C', demand: '200' }];
+const COST = [['5', '4', '3'], ['8', '4', '3'], ['9', '7', '5']];
 
 export const TRANS_EXAMPLES: Record<TransExampleKey, TransProblem> = {
     nwc: { method: 'nwc', cur: '₱', sources: SOURCES, dests: DESTS, cost: COST },
     lc: { method: 'lc', cur: '₱', sources: SOURCES, dests: DESTS, cost: COST },
-    balanced: {
+    /* unbalanced: supply 75 is more than demand 65, so a Dummy destination takes the 10 that are not shipped */
+    unbalanced: {
         method: 'lc', cur: '₱',
         sources: [{ name: 'F1', supply: '20' }, { name: 'F2', supply: '30' }, { name: 'F3', supply: '25' }],
-        dests: [{ name: 'D1', demand: '15' }, { name: 'D2', demand: '25' }, { name: 'D3', demand: '35' }],
+        dests: [{ name: 'D1', demand: '15' }, { name: 'D2', demand: '25' }, { name: 'D3', demand: '25' }],
         cost: [['8', '6', '10'], ['9', '12', '13'], ['14', '9', '16']]
-    },
-    dummyrow: {
-        method: 'nwc', cur: '₱',
-        sources: [{ name: 'P', supply: '40' }, { name: 'Q', supply: '30' }],
-        dests: [{ name: 'R', demand: '30' }, { name: 'S', demand: '35' }, { name: 'T', demand: '25' }],
-        cost: [['4', '6', '8'], ['5', '3', '7']]
     }
 };

@@ -47,9 +47,14 @@ export function lessonSnapshot(lessonId: string, views: SavedView[]): { name?: s
 }
 
 /** Opens the code visualizer with some code in it */
-export function openVisualizer(src: string): void {
+export function openVisualizer(src: string, extra: { label: string; src: string }[] = []): void {
     const s = store.get<Record<string, unknown> | null>(KEYS.lesson('visualizer'), null) || {};
-    store.set(KEYS.lesson('visualizer'), { ...s, file: 'playground.c', idx: 0, edits: { 'playground.c': src } });
+    if (!extra.length) { store.set(KEYS.lesson('visualizer'), { ...s, file: 'playground.c', idx: 0, edits: { 'playground.c': src } }); return; }
+    /* the files of the exercise become the files of the visualizer: main.c first, then the others */
+    const files = [{ id: 'playground.c', label: 'main.c' }, ...extra.map((f, i) => ({ id: 'v' + (i + 1), label: f.label }))];
+    const edits: Record<string, string> = { 'playground.c': src };
+    extra.forEach((f, i) => { edits['v' + (i + 1)] = f.src; });
+    store.set(KEYS.lesson('visualizer'), { ...s, file: 'playground.c', idx: 0, edits, files });
 }
 
 /** Opens a saved problem in its lesson (on the Solve tab) */

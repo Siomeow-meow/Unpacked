@@ -51,7 +51,7 @@ export const SUBJECTS: SubjectMeta[] = [
             },
             {
                 id: 'transportation', number: 3, title: 'Transportation Problem', short: 'Transportation', thirdTab: 'Tables',
-                bullets: ['Balance supply and demand with a Dummy', 'Northwest Corner or Least Cost starting solution', 'Improve it with MODI until the cost is lowest'],
+                bullets: ['Balance supply and demand (a Dummy row or column when they differ)', 'Northwest Corner or Least Cost starting solution', 'Improve it with MODI or Stepping Stone until the cost is lowest'],
                 summarize: transportSummary
             }
         ]

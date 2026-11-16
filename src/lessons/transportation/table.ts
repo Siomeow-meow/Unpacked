@@ -64,7 +64,7 @@ export function transportTableHtml(t: TTable, ti: number, mt: TMetrics): string 
     t.cols.forEach((_, j) => { h += '<td' + at('d', j) + ' class="sd' + (j === t.newC ? ' newcell' : '') + '">' + demandHtml(t, j) + '</td>'; });
     h += '<td' + at('tc', 0) + ' class="tcell">' + (t.tc ? '<span class="v" title="Total cost">TC ' + esc(t.tc) + '</span>' : '') + '</td>' + (uv ? '<td></td>' : '') + '</tr>';
     if (uv) {
-        h += '<tr class="vrow"><th class="rowh">vⱼ</th>';
+        h += '<tr class="tvrow"><th class="rowh">vⱼ</th>';
         t.cols.forEach((_, j) => { h += '<td' + at('v', j) + ' class="uvc">' + (t.v && t.v[j] !== null && t.v[j] !== undefined ? '<span class="v">' + esc(t.v[j] as string) + '</span>' : '<span class="empty">&nbsp;</span>') + '</td>'; });
         h += '<td></td><td></td></tr>';
     }
@@ -83,16 +83,19 @@ function demandHtml(t: TTable, j: number): string {
     return '<span class="v">' + (b ? esc(b.d) + '<i class="to">→</i>' : '') + esc(t.left.d[j]) + '</span>';
 }
 
-/** the dashed closed path of the MODI loop, drawn over the table (cell centres joined in order) */
-export function drawLoop(viz: HTMLElement, t: TTable, ti: number): void {
+/** the dashed closed path of the MODI loop, drawn over the table (cell centres joined in order).
+    With `animate` the line draws itself from cell to cell, and the numbers of each cell appear when the line reaches it. */
+export function drawLoop(viz: HTMLElement, t: TTable, ti: number, animate = false): void {
     if (!t.loop || t.loop.length < 2) return;
     const vr = viz.getBoundingClientRect();
-    const pts: string[] = [];
+    const pts: [number, number][] = [];
+    const cells: HTMLElement[] = [];
     t.loop.forEach(c => {
         const el = viz.querySelector<HTMLElement>('[data-t="' + ti + '"][data-r="' + c.r + '"][data-c="' + c.c + '"]');
         if (!el) return;
         const r = el.getBoundingClientRect();
-        pts.push((r.left - vr.left + viz.scrollLeft + r.width / 2).toFixed(1) + ',' + (r.top - vr.top + viz.scrollTop + r.height / 2).toFixed(1));
+        pts.push([r.left - vr.left + viz.scrollLeft + r.width / 2, r.top - vr.top + viz.scrollTop + r.height / 2]);
+        cells.push(el);
     });
     if (pts.length < 2) return;
     const NS = 'http://www.w3.org/2000/svg';
@@ -102,8 +105,32 @@ export function drawLoop(viz: HTMLElement, t: TTable, ti: number): void {
     svg.setAttribute('width', String(W)); svg.setAttribute('height', String(H));
     svg.style.width = W + 'px'; svg.style.height = H + 'px';
     const path = document.createElementNS(NS, 'polygon');
-    path.setAttribute('points', pts.join(' '));
+    path.setAttribute('points', pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '));
     path.setAttribute('class', 'looppath');
     svg.appendChild(path);
+    if (animate) {
+        /* how far along the closed path each cell is (0 to 1) */
+        const seg = pts.map((p, i) => { const q = pts[(i + 1) % pts.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]); });
+        const total = seg.reduce((a, b) => a + b, 0) || 1;
+        const DUR = Math.max(900, pts.length * 550), START = 250;
+        let acc = 0;
+        cells.forEach((el, i) => {
+            el.classList.add('lcell');
+            el.style.setProperty('--ld', (START + (acc / total) * DUR) + 'ms');
+            acc += seg[i];
+        });
+        /* a mask uncovers the dashed line along the path, so it keeps its look and stays one connected line */
+        const id = 'lm' + Math.floor(Math.random() * 1e9);
+        const defs = document.createElementNS(NS, 'defs');
+        const mk = document.createElementNS(NS, 'mask');
+        mk.setAttribute('id', id); mk.setAttribute('maskUnits', 'userSpaceOnUse');
+        mk.setAttribute('x', '0'); mk.setAttribute('y', '0'); mk.setAttribute('width', String(W)); mk.setAttribute('height', String(H));
+        const mp = document.createElementNS(NS, 'path');
+        mp.setAttribute('d', 'M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L') + ' L' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1));
+        mp.setAttribute('pathLength', '1'); mp.setAttribute('fill', 'none'); mp.setAttribute('stroke', '#fff'); mp.setAttribute('stroke-width', '14');
+        mp.setAttribute('class', 'lmask'); mp.style.setProperty('--ld', DUR + 'ms'); mp.style.setProperty('--ls', START + 'ms');
+        mk.appendChild(mp); defs.appendChild(mk); svg.insertBefore(defs, path);
+        path.setAttribute('mask', 'url(#' + id + ')');
+    }
     viz.appendChild(svg);
 }

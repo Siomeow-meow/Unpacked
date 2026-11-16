@@ -12,18 +12,18 @@ export const BLANKS: Record<string, Blank[]> = {
     'hello-world.c': [[4, 5, 'print the two lines shown in the expected output, one printf for each']],
     'hello-syntax.c': [[6, 8, 'print the three lines shown in the expected output: use \\t for the tab, \\" for a quote and \\\\ for one backslash']],
     'var-types.c': [[4, 9, 'declare an int (19), a float (2.5), a char (A) and a double (3.14159), print them, then print the size of an int and of a char with sizeof']],
-    'var-assign.c': [[4, 8, 'a starts at 5, b is a copy of a, then add 1 to a, total is a + b; print a, b and total']],
-    'op-arith.c': [[4, 11, 'with a = 17 and b = 5 print the sum, difference, product, quotient and remainder, then divide as floats (cast one side) and print it with 2 decimals']],
-    'op-compare.c': [[4, 12, 'age 20 and hasId 1: work out adult (age >= 18), canEnter (adult && hasId) and child (!adult); x starts at 5, add 3, then 1 more; print all four']],
-    'if-grade.c': [[4, 15, 'score is 78: choose the grade letter with if / else if / else (90 A, 80 B, 70 C, otherwise F) and print it']],
-    'if-max.c': [[4, 16, 'find the largest of 12, 31 and 7 with if statements, then print whether the largest is even or odd']],
-    'loop-for.c': [[4, 9, 'with a for loop add 1, 2, 3, 4 and 5 into sum, print every round, then print the total']],
-    'loop-while.c': [[4, 16, 'count down 3, 2, 1 with a while loop and print liftoff; then count the digits of 4096 with a do ... while loop']],
-    'array-basic.c': [[4, 13, 'store the five scores in an array, loop over it to find the sum and the largest, then print the sum, the max and the average']],
-    'string-basic.c': [[5, 14, 'store "stack" in a char array, count its letters with a loop (stop at the \\0), print them, then print the word backwards']],
+    'var-assign.c': [[4, 8, 'a is read with scanf above: b is a copy of a, then add 1 to a, total is a + b; print a, b and total']],
+    'op-arith.c': [[4, 11, 'a and b are read with scanf above: print the sum, difference, product, quotient and remainder, then divide as floats (cast one side) and print it with 2 decimals']],
+    'op-compare.c': [[4, 12, 'age and hasId are read with scanf above: work out adult (age >= 18), canEnter (adult && hasId) and child (!adult); x starts at 5, add 3, then 1 more; print all four']],
+    'if-grade.c': [[4, 15, 'score is read with scanf above: choose the grade letter with if / else if / else (90 A, 80 B, 70 C, otherwise F) and print it']],
+    'if-max.c': [[4, 16, 'a, b and c are read with scanf above: find the largest with if statements, then print whether the largest is even or odd']],
+    'loop-for.c': [[4, 9, 'n is read with scanf above: with a for loop add 1, 2, 3 ... up to n into sum, print every round, then print the total']],
+    'loop-while.c': [[4, 16, 'start and value are read with scanf above: count down from start to 1 with a while loop and print liftoff; then count the digits of value with a do ... while loop']],
+    'array-basic.c': [[4, 13, 'the five scores are read into the array with scanf above: loop over it to find the sum and the largest, then print the sum, the max and the average']],
+    'string-basic.c': [[5, 14, 'word is read with scanf above: count its letters with a loop (stop at the \\0), print them, then print the word backwards']],
     'func-basic.c': [[3, 5, 'square(x): return x times x', 'fn'], [7, 12, 'bigger(a, b): return the larger of the two numbers', 'fn']],
     'func-by-value.c': [[3, 6, 'addTen(x): add 10 to x and print "inside addTen: x=..."', 'fn']],
-    'ptr-basic.c': [[4, 8, 'x is 10: make a pointer p to x, print x and *p, change x to 25 through p, and print x again']],
+    'ptr-basic.c': [[4, 8, 'x and y are read with scanf above: make a pointer p to x, print x and *p, change x to y through p, and print x again']],
     'ptr-swap.c': [[3, 7, 'swap(a, b): swap the two ints the pointers point at, using a temporary variable', 'fn']],
     /* ---------------- Programming 2: write whole functions ---------------- */
     'ptrarr-arithmetic.c': [[5, 12, 'point p at the array, print *p and *(p + 2), move p with p++ and print *p, then print every element with a second pointer that walks up to a + 4']],
@@ -34,13 +34,13 @@ export const BLANKS: Record<string, Blank[]> = {
     'sort-bubble.c': [[9, 17, 'bubbleSort(arr, n): repeatedly compare neighbours and swap the ones that are out of order (use swap)', 'fn']],
     'sort-insertion.c': [[3, 13, 'insertionSort(arr, n): take each element as key and shift the bigger elements on its left one place right, then drop key in the gap', 'fn']],
     'search-binary.c': [[3, 17, 'binarySearch(arr, n, target): keep low and high, look at the middle, and halve the range; return the index, or -1 when it is not found', 'fn']],
-    'struct-basic.c': [[10, 15, 'create the student {7, "Ana", 3.5} and print it, then an array of two students ({1, "Ben", 2.8}, {2, "Cy", 3.9}) and print each in a loop']],
+    'struct-basic.c': [[10, 15, 'the student s and the two students of list are read with scanf above: print s, then print each student of list in a loop']],
     'struct-pointer.c': [[8, 10, 'moveCopy(p): add 5 to p.x (p is a copy)', 'fn'], [12, 14, 'movePtr(p): add 5 to the x of the struct that p points at', 'fn']],
-    'dyn-malloc.c': [[5, 15, 'reserve 4 ints with malloc, store 10, 20, 30, 40 in them, add them up, print the sum and free the block']],
-    'dyn-realloc.c': [[5, 15, 'calloc 2 ints and store 5 and 6, grow the block to 4 ints with realloc, store 7 and 8, print them all and free the block']],
-    'file-write-read.c': [[4, 12, 'open notes.txt for writing (check for NULL), write the lines apple, banana and cherry, then close it'], [15, 19, 'open notes.txt for reading, print every line as "read: ..." with fgets, then close it']],
-    'file-numbers.c': [[4, 9, 'open scores.txt for writing and write 10, 20, 30, 40 and 50, one per line, then close it'], [11, 18, 'open scores.txt for reading, add up every number with fscanf, close it and print "sum = ..."']],
-    'file-append-count.c': [[8, 11, 'open log.txt for appending, add the lines second and third, then close it'], [13, 22, 'open log.txt for reading, count the lines (newline characters) with fgetc, close it and print "log.txt has N lines"']],
+    'dyn-malloc.c': [[5, 15, 'n is read with scanf above: reserve n ints with malloc, read n numbers into them with scanf, add them up, print the sum and free the block']],
+    'dyn-realloc.c': [[5, 15, 'v1, v2, v3 and v4 are read with scanf above: calloc 2 ints and store v1 and v2, grow the block to 4 ints with realloc, store v3 and v4, print them all and free the block']],
+    'file-write-read.c': [[4, 12, 'the three words are read with scanf above: open notes.txt for writing (check for NULL), write each word on its own line, then close it'], [15, 19, 'open notes.txt for reading, print every line as "read: ..." with fgets, then close it']],
+    'file-numbers.c': [[4, 9, 'n and step are read with scanf above: open scores.txt for writing and write step, 2 * step, 3 * step ... n * step, one per line, then close it'], [11, 18, 'open scores.txt for reading, add up every number with fscanf, close it and print "sum = ..."']],
+    'file-append-count.c': [[8, 11, 'k is read with scanf above: open log.txt for appending, add the line "more" k times, then close it'], [13, 22, 'open log.txt for reading, count the lines (newline characters) with fgetc, close it and print "log.txt has N lines"']],
     'adt-arraylist-pointer.c': [[17, 26, 'insertPos(L, data, pos): do nothing when the list is full or pos is out of range; otherwise shift the later items right, store data and count it', 'fn'], [28, 36, 'deletePos(L, pos): do nothing when pos is out of range; otherwise shift the later items left and lower the count', 'fn'], [38, 45, 'locate(L, data): return the index of data, or -1', 'fn']],
     'adt-arraylist-value.c': [[17, 29, 'insertPos(L, data, position): shift the elements from position to the right (memcpy), store data, count it and return the changed copy', 'fn'], [31, 41, 'deletePos(L, position): shift the later elements left (memcpy), lower the count and return the changed copy', 'fn'], [43, 53, 'locate(L, data): return the index of data, or -1', 'fn']],
     'adt-students-resize.c': [[42, 62, 'insertPos(L, elem, pos): reject a bad position, resize when the list is full, shift the later elements right, store elem and count it', 'fn'], [65, 78, 'deletePos(L, pos): reject a bad position, shift the later elements left and lower the count', 'fn'], [128, 140, 'resize(L): double the size with realloc and update L->elemPtr and L->max', 'fn']],
@@ -51,6 +51,7 @@ export const BLANKS: Record<string, Blank[]> = {
     'stack-array-malloc.c': [[29, 37, 'push(s, value): when the stack is not full raise top and store value there; otherwise print "Stack Overflow"', 'fn'], [39, 48, 'pop(s): when the stack is not empty lower top; otherwise print "Stack Underflow"; return the popped item', 'fn'], [50, 58, 'peek(s): return the top item, or print "Stack is empty" and return -1', 'fn']],
     'stack-linkedlist.c': [[9, 14, 'push(top, x): make a node for x that points at the old top, and make it the new top', 'fn'], [16, 22, 'pop(top): take the data of the top node, make the next node the top, free the old one and return the data', 'fn'], [24, 26, 'peek(top): return the data of the top node', 'fn']],
     'queue-circular.c': [[36, 47, 'enqueue(q, value): do nothing when full; the first item sets front and rear to 0; otherwise move rear on by one (wrapping around with %); store value and count it', 'fn'], [49, 63, 'dequeue(q): take the item at front, move front on by one (wrapping around), lower the count and return the item', 'fn']],
+    'queue-circular-gap.c': [[29, 34, 'enqueue(q, value): do nothing when full; otherwise move rear on by one (wrapping around with %) and store value there', 'fn'], [36, 42, 'dequeue(q): take the item at front, move front on by one (wrapping around) and return the item', 'fn']],
     'queue-linkedlist.c': [[14, 24, 'enqueue(q, x): add a node for x at the rear (the first node is also the front)', 'fn'], [26, 35, 'dequeue(q): take the front node, move front on, clear rear when the queue is empty, free the node and return its data', 'fn']],
     'cursor-basic.c': [[23, 29, 'allocSpace(V): take a free cell from the avail list and return its index (-1 when there is none)', 'fn'], [31, 34, 'freeSpace(V, i): put cell i back at the front of the avail list', 'fn'], [36, 43, 'insertFirst(L, V, x): take a free cell, store x in it and make it the first element of the list', 'fn']],
     'cursor-vheap.c': [[29, 37, 'allocSpace(V): take a free cell from the avail list and return its index (-1 when there is none)', 'fn'], [54, 70, 'insertLast(L, V, elem): take a free cell, store elem in it and link it after the last element', 'fn'], [72, 84, 'deleteElem(L, V, elem): find the cell that holds elem, unlink it and give it back with deallocSpace', 'fn']],
@@ -80,6 +81,8 @@ export const FIXES: Record<string, [string, string][]> = {
         ['//    display(L);\n//    \n//    deletePos', '    display(L);\n//    \n//    deletePos']
     ]
 };
+
+import { INPUTS, applyEdits } from './practiceTests';
 
 const norm = (s: string) => s.replace(/\r\n/g, '\n');
 
@@ -118,6 +121,8 @@ export function solutionOf(id: string, src: string): string {
         if (!s.includes(find)) throw new Error('practiceSpec: the fix for ' + id + ' does not match the code');
         s = s.split(find).join(repl);
     }
+    s = applyEdits(id, s, INPUTS[id]?.both);        // the lines that read the input
+    s = applyEdits(id, s, INPUTS[id]?.solution);    // the part the learner writes, now using what was read
     return withPrototypes(s);
 }
 
@@ -135,7 +140,7 @@ function wrap(text: string, indent: string, width = 64): string[] {
 /** what the learner starts with: the example with the marked parts taken out (a bug example starts as it is, with its bug); prototypes first */
 export function starterOf(id: string, src: string): string {
     const s = norm(src);
-    if (FIXES[id]) return withPrototypes(s);
+    if (FIXES[id]) return withPrototypes(applyEdits(id, s, INPUTS[id]?.both));
     const blanks = BLANKS[id];
     if (!blanks) throw new Error('practiceSpec: no blank for ' + id);
     const lines = s.split('\n');
@@ -149,5 +154,5 @@ export function starterOf(id: string, src: string): string {
             lines.splice(a - 1, b - a + 1, lines[a - 1], ...todo, indent + '}');
         } else lines.splice(a - 1, b - a + 1, ...wrap('TODO: ' + what, indent));
     }
-    return withPrototypes(lines.join('\n'));
+    return withPrototypes(applyEdits(id, lines.join('\n'), INPUTS[id]?.both));
 }

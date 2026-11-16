@@ -28,8 +28,8 @@ describe('subject registry', () => {
     it('every available lesson exists in the lesson registry', () => {
         qm.lessons.forEach(l => expect(findLesson('qm', l.id)).toBeDefined());
     });
-    it('only the subject added in the latest version is marked NEW', () => {
-        expect(SUBJECT_ENTRIES.filter(s => s.since === LATEST_VERSION).map(s => s.id)).toEqual(['dsa']);
+    it('only a subject added in the latest version is marked NEW (v2.1 added none, so C Programming is no longer NEW)', () => {
+        expect(SUBJECT_ENTRIES.filter(s => s.since === LATEST_VERSION).map(s => s.id)).toEqual([]);
     });
     it('finds a lesson and its subject by id', () => { expect(findLessonEntry('simplex')?.subject.id).toBe('qm'); expect(findLessonEntry('nope')).toBeUndefined(); });
     it('adding a third subject needs only a registry entry', () => {

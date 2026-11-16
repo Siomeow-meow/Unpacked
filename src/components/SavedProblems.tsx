@@ -1,26 +1,10 @@
-/* "Examples" and "Saved problems" for any lesson. Saved problems live in one shared list (see storage.ts),
-   each item tagged with its lesson. Export / Import use the same JSON shape as the original app. */
-import { useEffect, useState } from 'react';
+/* "Saved problems" for any lesson: one scrolling list that starts with the lesson's examples, then the problems you saved (the newest at the bottom).
+   Saved problems live in one shared list (see storage.ts), each item tagged with its lesson. Export / Import use the same JSON shape as the original app. */
+import { useEffect, useRef, useState } from 'react';
 import { clone } from '../lib/util';
 import { loadSaved, saveSaved, type SavedItem } from '../lib/storage';
 
 export interface ExampleItem { key: string; name: string; meta: string }
-
-export function ExamplesList({ items, onLoad }: { items: ExampleItem[]; onLoad: (key: string) => void }) {
-    return (
-        <>
-            <h2>Examples</h2>
-            <ul id="exampleList" className="plist">
-                {items.map(it => (
-                    <li key={it.key} onClick={() => onLoad(it.key)}>
-                        <span className="nm">{it.name}</span><span className="meta">{it.meta}</span>
-                        <button className="btn small" type="button">Load</button>
-                    </li>
-                ))}
-            </ul>
-        </>
-    );
-}
 
 interface SavedProps<P> {
     lesson: string;
@@ -31,22 +15,27 @@ interface SavedProps<P> {
     onLoad: (p: P) => void;
     onError: (msg: string) => void;
     fileName: string;
+    /** the lesson's built-in examples: they are the first rows of the list */
+    examples?: ExampleItem[];
+    onExample?: (key: string) => void;
 }
 
-export function SavedProblems<P>({ lesson, problem, isValid, meta, onLoad, onError, fileName }: SavedProps<P>) {
+export function SavedProblems<P>({ lesson, problem, isValid, meta, onLoad, onError, fileName, examples = [], onExample }: SavedProps<P>) {
     const [all, setAll] = useState<SavedItem[]>(() => loadSaved());
     const [name, setName] = useState('');
     useEffect(() => { setAll(loadSaved()); }, []);
-    const mine = all.filter(s => s.lesson === lesson);
+    const mine = all.filter(s => s.lesson === lesson).sort((a, b) => a.ts - b.ts);     // oldest first, so a new one lands at the bottom
+    const listEl = useRef<HTMLUListElement>(null);
 
     const write = (list: SavedItem[]) => { setAll(list); return saveSaved(list); };
 
     const save = () => {
         const nm = name.trim() || ('Problem ' + new Date().toLocaleString());
         const list = loadSaved();
-        list.unshift({ id: String(Date.now()) + Math.random().toString(36).slice(2, 6), name: nm, ts: Date.now(), lesson, problem: clone(problem) });
+        list.push({ id: String(Date.now()) + Math.random().toString(36).slice(2, 6), name: nm, ts: Date.now(), lesson, problem: clone(problem) });
         if (!write(list)) onError('Could not save (browser storage is blocked).');
         setName('');
+        requestAnimationFrame(() => { if (listEl.current) listEl.current.scrollTop = listEl.current.scrollHeight; });
     };
     const del = (id: string) => write(loadSaved().filter(x => x.id !== id));
     const load = (id: string) => {
@@ -79,19 +68,22 @@ export function SavedProblems<P>({ lesson, problem, isValid, meta, onLoad, onErr
     };
 
     return (
-        <>
+        <div className="svWrap">
             <div className="row between h2b">
-                <h2>Saved problems <small>(this browser only)</small></h2>
+                <h2>Saved problems</h2>
                 <div className="row gap tight">
                     <button className="btn small" id="exportBtn" type="button" onClick={doExport}>Export</button>
                     <label className="btn small filebtn">Import<input type="file" id="importFile" accept="application/json" hidden onChange={doImport} /></label>
                 </div>
             </div>
-            <div className="saveRow">
-                <input id="saveName" placeholder="Name, e.g. Quiz 2 #3" value={name} onChange={e => setName(e.target.value)} />
-                <button className="btn small" id="saveBtn" type="button" onClick={save}>Save current</button>
-            </div>
-            <ul id="savedList">
+            <ul id="savedList" ref={listEl}>
+                {examples.map(it => (
+                    <li key={'ex-' + it.key} className="ex" onClick={() => onExample?.(it.key)}>
+                        <span className="nm">{it.name}</span>
+                        <span className="meta">{it.meta}</span>
+                        <button className="btn small" type="button">Load</button>
+                    </li>
+                ))}
                 {mine.map(s => (
                     <li key={s.id}>
                         <span className="nm">{s.name}</span>
@@ -101,7 +93,11 @@ export function SavedProblems<P>({ lesson, problem, isValid, meta, onLoad, onErr
                     </li>
                 ))}
             </ul>
-            <p className="note">Your inputs and progress are saved automatically in this browser. Nothing is sent anywhere.</p>
-        </>
+            <div className="saveRow">
+                <input id="saveName" placeholder="Name this problem, e.g. Quiz 2 #3" value={name} onChange={e => setName(e.target.value)} />
+                <button className="btn small" id="saveBtn" type="button" onClick={save}>Save current</button>
+            </div>
+            <p className="note">Saved in this browser only. Your inputs and progress are saved automatically. Nothing is sent anywhere.</p>
+        </div>
     );
 }

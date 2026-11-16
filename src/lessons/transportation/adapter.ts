@@ -33,7 +33,7 @@ export const transportAdapter: VizAdapter<TransStep> = {
             m = { w0: Math.max(40, Math.floor(m.w0 * f)), u: Math.max(18, Math.floor(m.u * f)), rowH: Math.max(11, Math.floor(m.rowH * f)), fs: Math.max(7, m.fs * f), cfs: Math.max(6, m.cfs * f) };
             v.innerHTML = '<div class="tw">' + transportTableHtml(t, 0, m) + '</div>';
         }
-        drawLoop(v, t, 0);
+        drawLoop(v, t, 0, /( loop| index)$/.test(s.group || ''));     // the loop draws itself on the step that introduces it
         return m.u;
     }
 };

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { parseFr } from '../../lib/simplex/solver';
 import { MAX_SIDE, solveTransport, type TransProblem, type TransStep } from '../../lib/transportation/solver';
 import { clamp, clone } from '../../lib/util';
-import { ExamplesList, SavedProblems } from '../../components/SavedProblems';
+import { SavedProblems } from '../../components/SavedProblems';
 import { LessonShell } from '../../components/LessonShell';
 import { StepCard } from '../../components/StepCard';
 import { simpleTableHtml } from '../../components/simpleTable';
@@ -71,7 +71,7 @@ export default function TransportationLesson() {
     const m = P.sources.length, n = P.dests.length;
     const sp = L.solvedP;
     const chips: Chip[] = sp ? [
-        { text: (sp.method === 'nwc' ? 'Northwest Corner' : 'Least Cost') + ' + MODI', obj: true },
+        { text: (sp.method === 'nwc' ? 'Northwest Corner' : 'Least Cost') + ' + ' + (sp.improve === 'stepping' ? 'Stepping Stone' : 'MODI'), obj: true },
         { text: 'Supply ' + sp.sources.map(s => s.name + ' ' + s.supply).join(' · ') },
         { text: 'Demand ' + sp.dests.map(d => d.name + ' ' + d.demand).join(' · ') }
     ] : [];
@@ -79,11 +79,22 @@ export default function TransportationLesson() {
     const problem = (
         <div className="grid">
             <section className="card" id="setup">
-                <div className="row between">
-                    <h2>Your problem</h2>
-                    <div className="seg" role="radiogroup" aria-label="Starting method">
-                        <label><input type="radio" name="method" value="nwc" checked={P.method === 'nwc'} onChange={() => edit(p => { p.method = 'nwc'; })} /> <span>Northwest Corner</span></label>
-                        <label><input type="radio" name="method" value="lc" checked={P.method === 'lc'} onChange={() => edit(p => { p.method = 'lc'; })} /> <span>Least Cost</span></label>
+                <h2>Your problem</h2>
+                <div className="mpath">
+                    <div className="mstep" role="radiogroup" aria-label="Starting method">
+                        <div className="mhead"><em>1</em>Start with</div>
+                        <div className="mtiles">
+                            <label className="mtile"><input type="radio" name="method" value="nwc" checked={P.method === 'nwc'} onChange={() => edit(p => { p.method = 'nwc'; })} /><span><i aria-hidden>↖</i><b>Northwest Corner</b><small>Begins top-left, ignores cost</small></span></label>
+                            <label className="mtile"><input type="radio" name="method" value="lc" checked={P.method === 'lc'} onChange={() => edit(p => { p.method = 'lc'; })} /><span><i aria-hidden>min</i><b>Least Cost</b><small>Fills the cheapest cell first</small></span></label>
+                        </div>
+                    </div>
+                    <div className="marrow" aria-hidden>→</div>
+                    <div className="mstep" role="radiogroup" aria-label="Improvement method">
+                        <div className="mhead"><em>2</em>Improve with</div>
+                        <div className="mtiles">
+                            <label className="mtile"><input type="radio" name="improve" value="modi" checked={P.improve !== 'stepping'} onChange={() => edit(p => { p.improve = 'modi'; })} /><span><i aria-hidden>u+v</i><b>MODI</b><small>Scores cells with u and v</small></span></label>
+                            <label className="mtile"><input type="radio" name="improve" value="stepping" checked={P.improve === 'stepping'} onChange={() => edit(p => { p.improve = 'stepping'; })} /><span><i aria-hidden>◻︎</i><b>Stepping Stone</b><small>Traces a loop per empty cell</small></span></label>
+                        </div>
                     </div>
                 </div>
 
@@ -130,23 +141,17 @@ export default function TransportationLesson() {
                     <button className="btn small" id="delDst" disabled={n <= 1} onClick={() => edit(p => { p.dests.pop(); p.cost.forEach(r => r.pop()); })}>− Destination</button>
                     <label className="cur">Currency <input id="cur" maxLength={3} value={P.cur || ''} onChange={e => edit(p => { p.cur = e.target.value; })} /></label>
                 </div>
-                <p className="hint" id="modeHint">{P.method === 'nwc'
-                    ? 'Northwest Corner starts at the top-left cell and ignores costs. MODI then improves it until the total cost is lowest.'
-                    : 'Least Cost starts with the cheapest cells (Dummy last). MODI then improves it until the total cost is lowest.'}</p>
+                <p className="hint" id="modeHint">Supply and demand not equal? A Dummy row or column is added to balance them.</p>
 
                 <p className="error" id="err" role="alert">{L.err}</p>
             </section>
 
             <section className="card" id="saves">
-                <ExamplesList
-                    items={[
-                        { key: 'nwc', name: 'Northwest Corner (Dummy column)', meta: 'NW' },
-                        { key: 'lc', name: 'Least Cost (Dummy column)', meta: 'LC' },
-                        { key: 'balanced', name: 'Already balanced', meta: 'LC' },
-                        { key: 'dummyrow', name: 'Demand bigger (Dummy row)', meta: 'NW' }
-                    ]}
-                    onLoad={k => L.loadProblem(TRANS_EXAMPLES[k as TransExampleKey])} />
-                <SavedProblems<TransProblem> lesson="transportation" problem={P} isValid={validProblem} fileName="transportation-problems.json"
+                <SavedProblems<TransProblem> examples={[
+                        { key: 'nwc', name: 'Default: Northwest Corner', meta: 'NW' },
+                        { key: 'lc', name: 'Default: Least Cost', meta: 'LC' },
+                        { key: 'unbalanced', name: 'Unbalanced problem', meta: 'LC' }
+                    ]} onExample={k => L.loadProblem({ ...clone(TRANS_EXAMPLES[k as TransExampleKey]), improve: P.improve })} lesson="transportation" problem={P} isValid={validProblem} fileName="transportation-problems.json"
                     meta={p => (p.method === 'nwc' ? 'NW Corner' : 'Least Cost')} onLoad={q => L.loadProblem(CONFIG.normalize!(q))} onError={L.setErr} />
             </section>
         </div>

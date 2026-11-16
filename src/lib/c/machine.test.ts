@@ -129,6 +129,7 @@ describe('C interpreter: every DSA snippet', () => {
         'stack-array-malloc.c': /^S = 30, 20, 10\nTop element is 30\nPopped element is 30\nS = 20, 10\n$/,
         'stack-linkedlist.c': /^top is 30\npopped 30\npopped 20\ntop is 10\n$/,
         'queue-circular.c': /^1 3 2 5\n1 3 2 5 4\n$/,
+        'queue-circular-gap.c': /^10 20 30 40 50 \ndequeued 10\ndequeued 20\n30 40 50 60 70 \nfront = 3, rear = 1\n$/,
         'queue-linkedlist.c': /^dequeued 1\ndequeued 2\ndequeued 3\n$/,
         'dict-array.c': /^205 -> Ben\n101 -> not found\ncount = 2\n$/,
         'dict-sorted.c': /^30 is at index 2\n35 is at index -1\n$/,
@@ -177,5 +178,23 @@ describe('C interpreter: every DSA snippet', () => {
         expect(names('prog2')).toEqual(['Pointers & Arrays', 'Recursion', 'Sorting & Searching', 'Structs', 'Dynamic Memory', 'File Handling', 'ADT', 'Linked List']);
         expect(names('dsa')).toEqual(['Stack & Queue', 'Cursor-Based', 'Sets', 'Hashing', 'Dictionary', 'Trees', 'Binary Heap', 'Graphs']);
         expect(DSA_META.map(m => m.subject)).toEqual([...Array(8).fill('prog1'), ...Array(8).fill('prog2'), ...Array(8).fill('dsa')]);   // the groups follow each other
+    });
+});
+
+describe('C interpreter: strings are drawn as characters', () => {
+    const last = (src: string) => { const t = run(src); return t.steps[t.steps.length - 2].snap.frames[0].vars; };
+    it('a char array has one box per character, ending with \0', () => {
+        const v = last('int main(){ char s[8] = "abba"; return 0; }');
+        const s = v.find(c => c.name === 's')!;
+        expect(s.kind).toBe('array');
+        expect(s.strText).toBe('abba');
+        expect(s.children!.slice(0, 6).map(c => c.text)).toEqual(['a', 'b', 'b', 'a', '\\0', '\\0']);
+    });
+    it('a char* shows the characters it points to, not only the address', () => {
+        const v = last('int main(){ char *p = "level"; return 0; }');
+        const p = v.find(c => c.name === 'p')!;
+        expect(p.kind).toBe('ptr');
+        expect(p.strText).toBe('level');
+        expect(p.chars).toEqual(['l', 'e', 'v', 'e', 'l', '\\0']);
     });
 });

@@ -4,6 +4,7 @@ import { CompileError, T_CHAR, T_DOUBLE, T_FILE, T_INT, T_LONG, T_VOID, alignOf,
 
 export class RuntimeError extends Error { constructor(msg: string, public line: number) { super(msg); } }
 class ExitSignal { constructor(public code: number) { } }
+class WaitSignal { constructor(public line: number) { } }
 class ReturnSignal { constructor(public val: RV | null) { } }
 
 /* ---------------- what a trace contains ---------------- */
@@ -11,14 +12,20 @@ export interface Cell {
     id: string; name: string; type: string; text: string; init: boolean; addr: number; size: number;
     kind: 'scalar' | 'ptr' | 'struct' | 'array' | 'string';
     target?: number; pt?: CType; children?: Cell[]; more?: number; rw?: 'r' | 'w' | 'rw';
+    /** a char array, or a char* that points to text: the text, and one entry per character (a char array has them in children too) */
+    strText?: string; chars?: string[];
 }
 export interface FrameView { fn: string; line: number; args: string; vars: Cell[] }
 export interface BlockView { addr: number; size: number; freed: boolean; site: string; elemType: string; cells: Cell[]; more: number }
 export interface Snapshot { frames: FrameView[]; heap: BlockView[]; globals: Cell[] }
 export interface FormulaPart { t: string; k?: 'r' | 'w' | 'v' }
 export interface TraceStep { n: number; kind: string; line: number; depth: number; title: string; html: string; formula: FormulaPart[]; snap: Snapshot; outLen: number; error?: boolean }
-export interface Trace { steps: TraceStep[]; output: string; error?: string; errorLine?: number; exitCode?: number; truncated?: boolean }
-export interface RunOptions { input?: string; maxSteps?: number }
+export interface Trace { steps: TraceStep[]; output: string; error?: string; errorLine?: number; exitCode?: number; truncated?: boolean; waiting?: boolean }
+/** interactive: a scanf / getchar that has no input left makes the run stop and wait (the page asks for a line and runs again); typed text is echoed to the output like a terminal. eof: the input was ended (Ctrl+D), so reading returns EOF. */
+export interface RunOptions { input?: string; maxSteps?: number; interactive?: boolean; eof?: boolean }
+
+/** one character as a box shows it: the letter, '\0' for the end of a text, the number for the rest */
+const charText = (b: number): string => (b === 0 ? '\\0' : b === 32 ? '␣' : b > 32 && b < 127 ? String.fromCharCode(b) : String(b));
 
 /* ---------------- values ---------------- */
 interface Num { t: CType; n: number }
@@ -67,7 +74,8 @@ export class Machine {
     frames: Frame[] = [];
     globalsVars: Var[] = [];
     strings = new Map<string, number>();
-    out = ''; input = ''; inPos = 0;
+    statics = new Map<object, Var>(); staticNext = DATA_BASE + 0x3c00;
+    out = ''; input = ''; inPos = 0; interactive = false; eof = false; echoed = 0;
     /* the in-memory disk: file name -> text, and the open files (handle -> where it is up to) */
     files = new Map<string, string>();
     fhs = new Map<number, { name: string; mode: string; pos: number; eof: boolean }>();
@@ -80,7 +88,15 @@ export class Machine {
     notes: string[] = []; uninitRead = false;
     curLine = 1;
 
-    constructor(prog: Program, opts: RunOptions = {}) { this.prog = prog; this.input = opts.input || ''; this.maxSteps = opts.maxSteps || 4000; }
+    constructor(prog: Program, opts: RunOptions = {}) { this.prog = prog; this.input = opts.input || ''; this.maxSteps = opts.maxSteps || 4000; this.interactive = !!opts.interactive; this.eof = !!opts.eof; }
+    /** reading with no input left: an interactive run waits for the user */
+    need(line: number): void { if (this.interactive && !this.eof && this.inPos >= this.input.length) throw new WaitSignal(line); }
+    /** what was typed is shown in the output, a whole line at a time, like a terminal does */
+    echoIn(): void {
+        if (!this.interactive || this.inPos <= 0) return;
+        const nl = this.input.indexOf('\n', this.inPos - 1), upto = nl < 0 ? this.input.length : nl + 1;
+        if (upto > this.echoed) { this.out += this.input.slice(this.echoed, upto); this.echoed = upto; }
+    }
 
     /* ======== memory ======== */
     err(msg: string, line = this.curLine): never { throw new RuntimeError(msg, line); }
@@ -145,6 +161,13 @@ export class Machine {
         }
         this.rawStore(addr, bytes, null);
         this.track(this.writes, addr, size);
+    }
+    /** a quick check (no error is made) that a byte at this address can be read: used to draw the text a char* points to */
+    readable(addr: number): boolean {
+        if (addr >= STACK_LO && addr < STACK_HI) return true;
+        if (addr >= DATA_BASE && addr < DATA_BASE + DATA_SIZE) return true;
+        if (addr >= HEAP_BASE && addr < HEAP_BASE + HEAP_SIZE) return this.blocks.some(x => !x.freed && addr >= x.addr && addr < x.addr + x.size);
+        return false;
     }
     inited(addr: number, len: number): boolean {
         try { return this.rawLoad(addr, len).init.every(x => x === 1); } catch { return false; }
@@ -228,7 +251,7 @@ export class Machine {
         this.store(t, addr, c.n);
     }
     loadRV(t: CType, addr: number): RV {
-        if (t.k === 'struct') { const { bytes, init } = this.rawLoad(addr, t.size); this.track(this.reads, addr, t.size); if (this.tracking && init.some(x => !x)) this.uninitRead = true; return { t, bytes, init }; }
+        if (t.k === 'struct') { const { bytes, init } = this.rawLoad(addr, t.size); this.track(this.reads, addr, t.size); return { t, bytes, init }; }      // copying a struct is fine even when some of its fields were never set (no warning: only reading a single value is flagged)
         if (t.k === 'arr') return { t: ptrTo(t.of), n: addr };           // arrays decay to a pointer to their first element
         if (t.k === 'void') return this.err('A void value cannot be used');
         return { t, n: this.load(t, addr) };
@@ -373,11 +396,12 @@ export class Machine {
             case '*': r = a.n * b.n; break;
             case '/': if (b.n === 0 && !fl) this.err('Division by zero', line); r = fl ? a.n / b.n : Math.trunc(a.n / b.n); break;
             case '%': if (b.n === 0) this.err('Division by zero (in %)', line); r = a.n % b.n; break;
-            case '&': r = a.n & b.n; break;
-            case '|': r = a.n | b.n; break;
-            case '^': r = a.n ^ b.n; break;
-            case '<<': r = a.n << b.n; break;
-            case '>>': r = a.n >> b.n; break;
+            /* a long (64 bits) needs BigInt: JavaScript's own bit operators work on 32 bits */
+            case '&': r = rt.k === 'int' && rt.size === 8 ? Number(BigInt.asIntN(64, BigInt(Math.trunc(a.n)) & BigInt(Math.trunc(b.n)))) : a.n & b.n; break;
+            case '|': r = rt.k === 'int' && rt.size === 8 ? Number(BigInt.asIntN(64, BigInt(Math.trunc(a.n)) | BigInt(Math.trunc(b.n)))) : a.n | b.n; break;
+            case '^': r = rt.k === 'int' && rt.size === 8 ? Number(BigInt.asIntN(64, BigInt(Math.trunc(a.n)) ^ BigInt(Math.trunc(b.n)))) : a.n ^ b.n; break;
+            case '<<': r = rt.k === 'int' && rt.size === 8 ? Number(BigInt.asIntN(64, BigInt(Math.trunc(a.n)) << BigInt(Math.trunc(b.n)))) : a.n << b.n; break;
+            case '>>': r = rt.k === 'int' && rt.size === 8 ? Number(BigInt(Math.trunc(a.n)) >> BigInt(Math.trunc(b.n))) : a.n >> b.n; break;
             default: return this.err('Unsupported operator ' + op, line);
         }
         return this.convert({ t: rt, n: r }, rt) as Num;
@@ -455,6 +479,31 @@ export class Machine {
             case 'free': { const a = num(0); this.free(a); this.notes.push('<b>free</b> gives the block at ' + hex(a) + ' back. Do not use it after this.'); return ret(0); }
             case 'memcpy': case 'memmove': { const d = num(0), s = num(1), n = num(2); if (n > 0) { const src = this.rawLoad(s, n); this.track(this.reads, s, n); this.rawStore(d, src.bytes, src.init); this.track(this.writes, d, n); this.notes.push('<b>' + name + '</b> copies ' + n + ' bytes from ' + hex(s) + ' to ' + hex(d) + '.'); } return ret(d, vp); }
             case 'memset': { const d = num(0), c = num(1) & 255, n = num(2); if (n > 0) { this.rawStore(d, new Uint8Array(n).fill(c), null); this.track(this.writes, d, n); } return ret(d, vp); }
+            case 'toupper': { const c = num(0); return ret(c >= 97 && c <= 122 ? c - 32 : c); }
+            case 'tolower': { const c = num(0); return ret(c >= 65 && c <= 90 ? c + 32 : c); }
+            case 'isalpha': case 'isdigit': case 'isalnum': case 'isspace': case 'isupper': case 'islower': case 'ispunct': {
+                const c = num(0), ch = c >= 0 && c < 256 ? String.fromCharCode(c) : '';
+                const re = { isalpha: /[A-Za-z]/, isdigit: /[0-9]/, isalnum: /[A-Za-z0-9]/, isspace: /[ \t\n\v\f\r]/, isupper: /[A-Z]/, islower: /[a-z]/, ispunct: /[!-\/:-@\[-`{-~]/ }[name] as RegExp;
+                return ret(ch && re.test(ch) ? 1 : 0);
+            }
+            case 'floor': return ret(Math.floor(num(0)), T_DOUBLE);
+            case 'ceil': return ret(Math.ceil(num(0)), T_DOUBLE);
+            case 'round': return ret(Math.sign(num(0)) * Math.round(Math.abs(num(0))), T_DOUBLE);
+            case 'fmod': return ret(num(0) % num(1), T_DOUBLE);
+            case 'sin': return ret(Math.sin(num(0)), T_DOUBLE);
+            case 'cos': return ret(Math.cos(num(0)), T_DOUBLE);
+            case 'tan': return ret(Math.tan(num(0)), T_DOUBLE);
+            case 'log': return ret(Math.log(num(0)), T_DOUBLE);
+            case 'log10': return ret(Math.log10(num(0)), T_DOUBLE);
+            case 'exp': return ret(Math.exp(num(0)), T_DOUBLE);
+            case 'strchr': case 'strrchr': {
+                const a = num(0), s = this.readStr(a), ch = num(1) & 255;
+                const ix = ch === 0 ? s.length : name === 'strchr' ? s.indexOf(String.fromCharCode(ch)) : s.lastIndexOf(String.fromCharCode(ch));
+                return ret(ix < 0 ? 0 : a + ix, ptrTo(T_CHAR));
+            }
+            case 'strstr': { const a = num(0), ix = this.readStr(a).indexOf(this.readStr(num(1))); return ret(ix < 0 ? 0 : a + ix, ptrTo(T_CHAR)); }
+            case 'sprintf': { const s = this.format(this.readStr(num(1)), args.slice(2), e.line); this.putStr(num(0), s); return ret(s.length); }
+            case 'snprintf': { const s = this.format(this.readStr(num(2)), args.slice(3), e.line), n = num(1); if (n > 0) this.putStr(num(0), s.slice(0, n - 1)); return ret(s.length); }
             case 'strlen': return ret(this.readStr(num(0)).length, { k: 'int', size: 8, signed: false, name: 'size_t' });
             case 'strcmp': { const a = this.readStr(num(0)), b = this.readStr(num(1)); return ret(a < b ? -1 : a > b ? 1 : 0); }
             case 'strncmp': { const n = num(2); const a = this.readStr(num(0)).slice(0, n), b = this.readStr(num(1)).slice(0, n); return ret(a < b ? -1 : a > b ? 1 : 0); }
@@ -466,8 +515,13 @@ export class Machine {
             case 'rand': return ret(Math.floor(Math.random() * 32768));
             case 'srand': return ret(0);
             case 'atoi': return ret(parseInt(this.readStr(num(0)), 10) || 0);
-            case 'scanf': return ret(this.scan(this.readStr(num(0)), args.slice(1), e.line));
-            case 'getchar': { if (this.inPos >= this.input.length) return ret(-1); return ret(this.input.charCodeAt(this.inPos++)); }
+            case 'scanf': {
+                const left0 = this.input.length - this.inPos, got = this.scan(this.readStr(num(0)), args.slice(1), e.line);
+                this.echoIn();
+                this.notes.push(got > 0 ? '<b>scanf</b> read <b>' + got + '</b> value' + (got > 1 ? 's' : '') + ' from the input.' : '<b>scanf</b> could not read anything' + (left0 <= 0 ? ': there is no input left (it was ended).' : ': what is left of the input does not match the format.') + ' The variable keeps its old value.');
+                return ret(got === 0 && left0 <= 0 ? -1 : got);
+            }
+            case 'getchar': { this.need(e.line); if (this.inPos >= this.input.length) return ret(-1); const ch = this.input.charCodeAt(this.inPos++); this.echoIn(); return ret(ch); }
             case 'sqrt': return ret(Math.sqrt(num(0)), T_DOUBLE);
             case 'pow': return ret(Math.pow(num(0), num(1)), T_DOUBLE);
             case 'fabs': return ret(Math.abs(num(0)), T_DOUBLE);
@@ -507,6 +561,15 @@ export class Machine {
                 return ret(c);
             }
             case 'fgets': {
+                if (num(2) === 20720) {      // stdin: one line of the input
+                    this.need(e.line);
+                    const n = num(1);
+                    if (this.inPos >= this.input.length) return ret(0, ptrTo(T_CHAR));
+                    let j = this.inPos; while (j < this.input.length && j - this.inPos < n - 1) { if (this.input[j++] === '\n') break; }
+                    const text = this.input.slice(this.inPos, j); this.inPos = j;
+                    this.putStr(num(0), text); this.echoIn();
+                    return ret(num(0), ptrTo(T_CHAR));
+                }
                 const f = this.fileFor(num(2), name, false, e.line), text = this.files.get(f.name) as string, n = num(1);
                 if (f.pos >= text.length) { f.eof = true; this.notes.push('<b>fgets</b> is at the end of <code>' + esc(f.name) + '</code>, so it returns <b>NULL</b>.'); return ret(0, ptrTo(T_CHAR)); }
                 let j = f.pos; while (j < text.length && j - f.pos < n - 1) { if (text[j++] === '\n') break; }
@@ -560,12 +623,12 @@ export class Machine {
         const skipWs = () => { while (this.inPos < this.input.length && /\s/.test(this.input[this.inPos])) this.inPos++; };
         for (let i = 0; i < fmt.length; i++) {
             if (/\s/.test(fmt[i])) { skipWs(); continue; }
-            if (fmt[i] !== '%') { if (this.input[this.inPos] === fmt[i]) this.inPos++; else break; continue; }
+            if (fmt[i] !== '%') { this.need(line); if (this.input[this.inPos] === fmt[i]) this.inPos++; else break; continue; }
             i++; while (/[0-9l]/.test(fmt[i] || '')) i++;
             const c = fmt[i]; const target = args[ai++] as Num | undefined;
             if (!target || isAgg(target)) this.err('scanf: missing the address to store the value (did you forget the & ?)', line);
-            if (c === 'c') { if (this.inPos >= this.input.length) break; this.store(T_CHAR, target.n, this.input.charCodeAt(this.inPos++)); count++; continue; }
-            skipWs();
+            if (c === 'c') { this.need(line); if (this.inPos >= this.input.length) break; this.store(T_CHAR, target.n, this.input.charCodeAt(this.inPos++)); count++; continue; }
+            skipWs(); this.need(line);
             let j = this.inPos;
             if (c === 'd' || c === 'i') { while (/[-+0-9]/.test(this.input[j] || '')) j++; if (j === this.inPos) break; this.store(T_INT, target.n, parseInt(this.input.slice(this.inPos, j), 10)); }
             else if (c === 'f' || c === 'g') { while (/[-+0-9.eE]/.test(this.input[j] || '')) j++; if (j === this.inPos) break; this.store({ k: 'float', size: 4, name: 'float' }, target.n, parseFloat(this.input.slice(this.inPos, j))); }
@@ -583,8 +646,13 @@ export class Machine {
             if (fmt[i] === '%') { out += '%'; continue; }
             let flags = ''; while ('-+ 0#'.includes(fmt[i] || 'x')) flags += fmt[i++];
             let width = ''; while (/[0-9]/.test(fmt[i] || '')) width += fmt[i++];
+            if (fmt[i] === '*') { const w = args[ai++]; i++; if (w === undefined || isAgg(w)) this.err('printf: the * needs a number argument', line); width = String(Math.abs(w.n)); if (w.n < 0) flags += '-'; }
             let prec = ''; let hasPrec = false;
-            if (fmt[i] === '.') { hasPrec = true; i++; while (/[0-9]/.test(fmt[i] || '')) prec += fmt[i++]; }
+            if (fmt[i] === '.') {
+                hasPrec = true; i++;
+                if (fmt[i] === '*') { const w = args[ai++]; i++; if (w === undefined || isAgg(w)) this.err('printf: the * needs a number argument', line); prec = String(w.n); }
+                else while (/[0-9]/.test(fmt[i] || '')) prec += fmt[i++];
+            }
             while (/[lhzjt]/.test(fmt[i] || '')) i++;
             const c = fmt[i];
             const a = args[ai++];
@@ -593,11 +661,12 @@ export class Machine {
             let s: string;
             if (c === 'd' || c === 'i') { s = String(Math.trunc(a.n)); if (flags.includes('+') && a.n >= 0) s = '+' + s; }
             else if (c === 'u') s = String(a.n < 0 ? a.n + 4294967296 : Math.trunc(a.n));
+            else if (c === 'o') s = (a.n < 0 ? a.n + 4294967296 : a.n).toString(8);
             else if (c === 'x' || c === 'X') { s = (a.n < 0 ? a.n + 4294967296 : a.n).toString(16); if (c === 'X') s = s.toUpperCase(); }
             else if (c === 'c') s = String.fromCharCode(a.n & 255);
             else if (c === 's') { s = a.n === 0 ? '(null)' : this.readStr(a.n); if (hasPrec) s = s.slice(0, +prec || 0); }
             else if (c === 'f' || c === 'F') s = a.n.toFixed(hasPrec ? +prec || 0 : 6);
-            else if (c === 'e') s = a.n.toExponential(hasPrec ? +prec || 0 : 6);
+            else if (c === 'e') s = a.n.toExponential(hasPrec ? +prec || 0 : 6).replace(/e([+-])(\d)$/, 'e$10$2');
             else if (c === 'g') s = String(+a.n.toPrecision(hasPrec ? +prec || 1 : 6));
             else if (c === 'p') s = a.n === 0 ? '(nil)' : hex(a.n);
             else return this.err('printf: the conversion %' + c + ' is not supported', line);
@@ -645,9 +714,26 @@ export class Machine {
                 this.resetTrack();
                 const formula: FormulaPart[] = [];
                 for (const d of s.decls) {
-                    const v = this.declare(d.name, d.type, s.line);
+                    let v: Var, firstTime = true;
+                    if (s.static) {      // a static variable is made once and keeps its value between calls
+                        const known = this.statics.get(d);
+                        if (known) {
+                            v = known; firstTime = false;
+                            const fr = this.frames[this.frames.length - 1];
+                            fr.scopes[fr.scopes.length - 1].set(d.name, v); fr.vars.push(v);
+                        } else {
+                            const size = Math.max(8, sizeOf(d.type));
+                            const addr = this.staticNext; this.staticNext += Math.ceil(size / 8) * 8;
+                            if (this.staticNext > DATA_BASE + DATA_SIZE) this.err('Too many static variables', s.line);
+                            this.dataInit.fill(1, addr - DATA_BASE, addr - DATA_BASE + sizeOf(d.type));
+                            v = { name: d.name, t: d.type, addr, line: s.line };
+                            this.statics.set(d, v);
+                            const fr = this.frames[this.frames.length - 1];
+                            fr.scopes[fr.scopes.length - 1].set(d.name, v); fr.vars.push(v);
+                        }
+                    } else v = this.declare(d.name, d.type, s.line);
                     this.declared.push({ name: d.name, type: d.type, addr: v.addr });
-                    if (d.init) {
+                    if (d.init && firstTime) {
                         this.initInto(d.type, v.addr, d.init);
                         const val = this.quiet(() => this.loadRV(d.type, v.addr));
                         if (formula.length) formula.push({ t: ',  ' });
@@ -675,6 +761,24 @@ export class Machine {
                 this.emit('if', s.line, 'Check ' + this.txt(s.c), this.condFormula(s.c, c), 'Line ' + s.line + ' tests <b>' + esc(this.txt(s.c)) + '</b>' + this.withVars(s.c) + '. It is <b>' + (c ? 'true' : 'false') + '</b>, so ' + (c ? 'the program goes into the <b>if</b> branch.' : (s.els ? 'the program goes into the <b>else</b> branch.' : 'the <b>if</b> branch is skipped.')), s.c);
                 if (c) return this.exec(s.then);
                 if (s.els) return this.exec(s.els);
+                return;
+            }
+            case 'switch': {
+                this.resetTrack();
+                const v = this.evalR(s.c);
+                if (isAgg(v)) this.err('A switch needs a number, not a whole struct', s.line);
+                let at = -1, label = 'no case matches';
+                for (const cs of s.cases) {
+                    if (!cs.value) continue;
+                    const cv = this.evalR(cs.value);
+                    if (!isAgg(cv) && cv.n === v.n) { at = cs.at; label = 'case ' + this.txt(cs.value); break; }
+                }
+                if (at < 0 && s.cases.some((x: { value: E | null }) => !x.value)) { at = s.cases.find((x: { value: E | null }) => !x.value).at; label = 'default'; }
+                this.emit('if', s.line, 'Switch ' + this.txt(s.c), [{ t: this.valText(s.c), k: 'r' }, { t: '  →  ' }, { t: label, k: 'v' }],
+                    'Line ' + s.line + ' switches on <b>' + esc(this.txt(s.c)) + '</b>' + this.withVars(s.c) + ', which is <b>' + esc(this.fmtVal(v)) + '</b>. ' + (at >= 0 ? 'The program jumps to <b>' + esc(label) + '</b> and runs on from there until a <b>break</b>.' : 'No case matches and there is no default, so the whole switch is skipped.'));
+                if (at < 0) return;
+                f.scopes.push(new Map());
+                try { for (let k = at; k < s.items.length; k++) { const r = this.exec(s.items[k]); if (r === 'break') return; if (r) return r; } } finally { f.scopes.pop(); }
                 return;
             }
             case 'while': {
@@ -751,6 +855,8 @@ export class Machine {
         if (v.t.k === 'ptr') return v.n === 0 ? 'NULL' : hex(v.n);
         if (v.t.k === 'float') return String(+v.n.toFixed(4));
         if (v.t.k === 'int' && v.t.name === 'bool') return v.n ? 'true' : 'false';
+        /* a char is shown as the character itself: 'b', '\\0' for the end of a text (other values stay numbers) */
+        if (v.t.k === 'int' && v.t.size === 1 && v.t.name.includes('char')) { const n = v.n & 255; if (n === 0) return "'\\0'"; if (n >= 32 && n < 127) return "'" + String.fromCharCode(n) + "'"; }
         return String(v.n);
     }
     hasSide(e: E): boolean {
@@ -859,10 +965,18 @@ export class Machine {
         if (t.k === 'arr') {
             const isStr = t.of.k === 'int' && t.of.size === 1 && t.of.name.includes('char');
             if (isStr) {
-                const ok = this.inited(addr, 1);
+                /* an array of characters: one box per character (the end of the text, '\0', is a box too) */
+                let sg: { buf: Uint8Array; init: Uint8Array; off: number } | null = null;
+                try { sg = this.seg(addr, t.n, false); } catch { sg = null; }
+                const byteAt = (i: number): number => (sg && sg.init[sg.off + i] === 1 ? sg.buf[sg.off + i] : -1);   // -1: never set
                 let s = '';
-                if (ok) { for (let i = 0; i < t.n; i++) { const b = this.rawLoad(addr + i, 1).bytes[0]; if (b === 0) break; s += String.fromCharCode(b); } }
-                return mark({ ...base, kind: 'string', text: ok ? '"' + s + '"' : '?', init: ok });
+                for (let i = 0; i < t.n; i++) { const b = byteAt(i); if (b <= 0) break; s += String.fromCharCode(b); }
+                const shown = Math.min(t.n, 24);
+                const kids: Cell[] = Array.from({ length: shown }, (_, i) => {
+                    const b = byteAt(i);
+                    return mark({ id: id + '[' + i + ']', name: '[' + i + ']', type: 'char', addr: addr + i, size: 1, kind: 'scalar', text: b >= 0 ? charText(b) : '?', init: b >= 0 });
+                });
+                return mark({ ...base, kind: 'array', text: '', init: true, more: t.n - shown, children: kids, strText: s });
             }
             const shown = Math.min(t.n, 24);
             return mark({ ...base, kind: 'array', text: '', init: true, more: t.n - shown, children: Array.from({ length: shown }, (_, i) => this.view('[' + i + ']', t.of, addr + i * sizeOf(t.of), id + '[' + i + ']')) });
@@ -871,7 +985,22 @@ export class Machine {
         const ok = this.inited(addr, size);
         if (!ok) return mark({ ...base, kind: t.k === 'ptr' ? 'ptr' : 'scalar', text: '?', init: false, pt: t.k === 'ptr' ? t.to : undefined });
         const n = this.quiet(() => this.load(t, addr)) ?? 0;
-        if (t.k === 'ptr') return mark({ ...base, kind: 'ptr', text: n === 0 ? 'NULL' : hex(n), init: true, target: n, pt: t.to });
+        if (t.k === 'ptr') {
+            const c: Cell = { ...base, kind: 'ptr', text: n === 0 ? 'NULL' : hex(n), init: true, target: n, pt: t.to };
+            /* a char* shows the characters it points to, until the '\0' (so a string literal or a text is readable, not only an address) */
+            if (n !== 0 && t.to.k === 'int' && t.to.size === 1 && t.to.name.includes('char') && this.readable(n)) {
+                const chars: string[] = []; let s = '', ended = false, i = 0;
+                for (; i < 24; i++) {
+                    if (!this.readable(n + i) || !this.inited(n + i, 1)) break;
+                    const b = this.rawLoad(n + i, 1).bytes[0];
+                    chars.push(charText(b));
+                    if (b === 0) { ended = true; break; }
+                    s += String.fromCharCode(b);
+                }
+                if (chars.length) { c.chars = chars; c.strText = s; c.more = ended ? 0 : 1; }
+            }
+            return mark(c);
+        }
         if (t.k === 'float') return mark({ ...base, kind: 'scalar', text: String(+n.toFixed(4)), init: true });
         if (t.k === 'int' && t.name === 'bool') return mark({ ...base, kind: 'scalar', text: n ? 'true' : 'false', init: true });
         const isChar = t.k === 'int' && t.size === 1 && t.name.includes('char');
@@ -918,7 +1047,7 @@ export class Machine {
 
     /* ======== running ======== */
     run(): Trace {
-        let error: string | undefined, errorLine: number | undefined, exitCode: number | undefined, truncated = false;
+        let error: string | undefined, errorLine: number | undefined, exitCode: number | undefined, truncated = false, waitLine = 0;
         try {
             this.frames.push({ fn: { name: '(globals)', ret: T_VOID, params: [], body: null, line: 0, endLine: 0 }, scopes: [new Map()], vars: [], sp0: this.sp, line: 0, args: '' });
             for (const g of this.prog.globals) for (const d of g.decls) {
@@ -938,6 +1067,7 @@ export class Machine {
             exitCode = 0;
         } catch (x) {
             if (x instanceof ExitSignal) exitCode = x.code;
+            else if (x instanceof WaitSignal) waitLine = x.line;
             else if (x instanceof RuntimeError) {
                 if (x.message === '__trunc__') { truncated = true; error = 'Stopped after ' + this.maxSteps + ' steps (is there an infinite loop?).'; }
                 else { error = x.message; errorLine = x.line; }
@@ -949,10 +1079,12 @@ export class Machine {
             const f = this.frames[this.frames.length - 1];
             this.steps.push({ n: this.steps.length + 1, kind: 'error', line: errorLine || this.curLine, depth: this.frames.length, title: 'Runtime error', html: '<b class="bad">The program crashed.</b> ' + esc(error), formula: [], snap, outLen: this.out.length, error: true });
             void f;
+        } else if (waitLine) {
+            this.steps.push({ n: this.steps.length + 1, kind: 'wait', line: waitLine, depth: this.frames.length, title: 'Waiting for input', html: 'Line ' + waitLine + ' needs input, and none is left. <b>Type it in the Output panel</b> and press Enter: the program carries on from here.', formula: [], snap: this.snapshot(), outLen: this.out.length });
         } else if (!error) {
             this.steps.push({ n: this.steps.length + 1, kind: 'end', line: this.prog.funcs.get('main')?.endLine || 0, depth: 0, title: 'Program ends', html: 'The program finished' + (exitCode ? ' with exit code ' + exitCode : ' normally') + '. ' + (this.blocks.some(b => !b.freed) ? 'Some heap memory was never freed (a <b>memory leak</b>): ' + this.blocks.filter(b => !b.freed).map(b => hex(b.addr)).join(', ') + '.' : 'All heap memory was freed.'), formula: [], snap: this.snapshot(), outLen: this.out.length });
         }
-        return { steps: this.steps, output: this.out, error, errorLine, exitCode, truncated };
+        return { steps: this.steps, output: this.out, error, errorLine, exitCode, truncated, waiting: waitLine > 0 };
     }
     callUserTop(f: Func, args: RV[]): void {
         // call main with a first "start" step

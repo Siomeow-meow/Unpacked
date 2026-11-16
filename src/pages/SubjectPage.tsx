@@ -64,8 +64,6 @@ export default function SubjectPage() {
     const hitSaved = useMemo(() => saved.filter(it => { const x = find(it.lesson), s = summary(it); return (it.name + ' ' + (x?.lesson.title || '') + ' ' + s.method + ' ' + s.result).toLowerCase().includes(query); }), [query, saved]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const nextId = last && lessons.some(x => x.lesson.id === last.lesson && !x.lesson.soon) ? last.lesson : undefined;   // highlighted: the lesson you left off at
-    const dashes = prog ? Math.min(prog.total, 24) : 0;
-    const filled = prog ? Math.max(1, Math.round(((prog.max + 1) / prog.total) * dashes)) : 0;
     const savedCount = (id: string) => saved.filter(s => s.lesson === id).length;
 
     const lessonStatus = (l: LessonMeta) => (l.soon ? <span className="st">Coming soon</span> : <span className="st go">Start lesson →</span>);
@@ -90,7 +88,7 @@ export default function SubjectPage() {
             </header>
 
             <main><section className="pane">
-                <div className={'homegrid' + (subject.sections && subject.sections.length > 1 ? ' multi' : '')}>
+                <div className={'homegrid multi'}>
                     {query ? (
                         <section className="card results">
                             <h2>Lessons</h2>
@@ -120,7 +118,6 @@ export default function SubjectPage() {
                                             <h2>{cont.lesson.title}</h2>
                                             <p className="muted">{contName || 'Your problem'} · {cont.subject.title}</p>
                                             {contSum && contSum.result !== '—' && <span className="chipres">{contSum.result}</span>}
-                                            {prog && <div className="dashes" aria-hidden="true">{Array.from({ length: dashes }, (_, i) => <i key={i} className={i < filled ? 'on' : ''} />)}</div>}
                                             {prog && <span className="muted small">{finished ? 'Finished · ' + prog.total + ' of ' + prog.total + ' steps' : 'Step ' + (prog.idx + 1) + ' of ' + prog.total}</span>}
                                             <div className="pickBtns">
                                                 <Link className="btn primary" to={route(cont.lesson, cont.subject.id)}>{finished ? 'Review the steps' : 'Continue'}</Link>
@@ -164,7 +161,7 @@ export default function SubjectPage() {
                                             <h2>{s.title} <small>{s.blurb}</small></h2>
                                             <span className="muted small">{s.lessons.filter(l => progress[l.id]).length} of {s.lessons.length} lessons tried</span>
                                         </div>
-                                        <div className={'path' + (s.lessons.length > 4 ? ' many' : '')}>
+                                        <div className={'path many'}>
                                             {s.lessons.map((l, i) => (
                                                 <div key={l.id} className="pstep">
                                                     {l.soon ? (

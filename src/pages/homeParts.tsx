@@ -13,9 +13,7 @@ import { DSA_THUMBS } from './thumbs';
 
 export function Logo() {
     return (
-        <svg className="logo" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
-            <path d="M12 2.8l8 4.4v9.6l-8 4.4-8-4.4V7.2z" /><path d="M4.4 7.4L12 11.8l7.6-4.4M12 11.8v9" />
-        </svg>
+        <svg className="logo" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round"><rect x="7.1" y="5.1" width="4.6" height="4.6" rx="1" /><rect x="2.5" y="9.7" width="4.6" height="4.6" rx="1" /><rect x="7.1" y="9.7" width="4.6" height="4.6" rx="1" /><rect x="11.7" y="9.7" width="4.6" height="4.6" rx="1" /><rect x="16.3" y="9.7" width="4.6" height="4.6" rx="1" /><rect x="7.1" y="14.3" width="4.6" height="4.6" rx="1" /></svg>
     );
 }
 
@@ -24,10 +22,13 @@ export function Thumb({ id }: { id: string }) {
     if (id === 'graphical') {
         return (
             <svg viewBox="0 0 72 56" preserveAspectRatio="xMaxYMid meet" className="thumb" aria-hidden="true">
-                <path d="M10 6v42h54" fill="none" stroke="var(--muted)" strokeWidth="1.5" />
-                <path d="M10 14L42 48H10z" fill="#f59f00" fillOpacity=".38" />
-                <path d="M10 8L54 48" stroke="#1c7ed6" strokeWidth="2" /><path d="M10 14L36 48" stroke="#e8590c" strokeWidth="2" />
-                <circle cx="27" cy="36" r="3.6" fill="#2b8a3e" />
+                {/* grid, then the feasible polygon whose corners are the axes, the intercepts and the point where the lines cross */}
+                <path d="M22 6V48M34 6V48M46 6V48M58 6V48M10 12H66M10 24H66M10 36H66" stroke="var(--line)" strokeWidth=".7" fill="none" />
+                <path d="M10 48V24L28.75 33L40 48z" fill="#f59f00" fillOpacity=".38" />
+                <path d="M10 8L40 48" stroke="#1c7ed6" strokeWidth="2" strokeLinecap="round" /><path d="M10 24L60 48" stroke="#e8590c" strokeWidth="2" strokeLinecap="round" />
+                <path d="M10 3V48H67" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M7 6L10 2L13 6M63 45L67 48L63 51" fill="none" stroke="var(--muted)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="28.75" cy="33" r="3.4" fill="#2b8a3e" stroke="var(--card)" strokeWidth="1" />
             </svg>
         );
     }

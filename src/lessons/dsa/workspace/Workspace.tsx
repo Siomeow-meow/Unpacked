@@ -94,7 +94,7 @@ export function Workspace({ ws, options, render }: { ws: WorkspaceApi; options: 
         setDrag({ source: panelId, kind: 'head', x0: x, y0: y, mode: 'none', dir: null, ratio: 0.5, sizePx: 0, target: panelId, ok: false, arrow: null });
     };
     const onHeadDown = (e: RPointerEvent<HTMLElement>, panelId: string) => {
-        if (e.button !== 0 || (e.target as Element).closest('.pmenu')) return;
+        if (e.button !== 0 || (e.target as Element).closest('.pmenu, .pmenu-list')) return;
         const el = e.currentTarget;
         if (e.pointerType === 'mouse') { e.preventDefault(); arm(panelId, el, e.pointerId, e.clientX, e.clientY); return; }
         cancelHold();
